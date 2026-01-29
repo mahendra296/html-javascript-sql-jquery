@@ -1,0 +1,913 @@
+-- 1. DEPARTMENTS TABLE
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY,
+    department_name VARCHAR(100) UNIQUE NOT NULL,
+    department_code VARCHAR(20) UNIQUE NOT NULL,
+    description TEXT,
+    location VARCHAR(100),
+    budget DECIMAL(12, 2),
+    manager_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. JOB POSITIONS TABLE
+CREATE TABLE job_positions (
+    id SERIAL PRIMARY KEY,
+    position_title VARCHAR(100) NOT NULL,
+    position_code VARCHAR(20) UNIQUE NOT NULL,
+    department_id INTEGER,
+    description TEXT,
+    min_salary DECIMAL(10, 2),
+    max_salary DECIMAL(10, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_department 
+        FOREIGN KEY (department_id) 
+        REFERENCES departments(id) 
+        ON DELETE SET NULL
+);
+
+-- 3. EMPLOYEES TABLE (Updated)
+CREATE TABLE employees (
+    id SERIAL PRIMARY KEY,
+    employee_id VARCHAR(20) UNIQUE NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone_number VARCHAR(20),
+    date_of_birth DATE,
+    hire_date DATE NOT NULL,
+    termination_date DATE,
+    department_id INTEGER,
+    position_id INTEGER,
+    manager_id INTEGER,
+    salary DECIMAL(10, 2),
+    employment_status VARCHAR(20) DEFAULT 'active',
+    employment_type VARCHAR(20) DEFAULT 'full_time',
+    address TEXT,
+    city VARCHAR(50),
+    state VARCHAR(50),
+    postal_code VARCHAR(10),
+    country VARCHAR(50) DEFAULT 'USA',
+    emergency_contact_name VARCHAR(100),
+    emergency_contact_phone VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_department 
+        FOREIGN KEY (department_id) 
+        REFERENCES departments(id) 
+        ON DELETE SET NULL,
+    
+    CONSTRAINT fk_position 
+        FOREIGN KEY (position_id) 
+        REFERENCES job_positions(id) 
+        ON DELETE SET NULL,
+    
+    CONSTRAINT fk_manager 
+        FOREIGN KEY (manager_id) 
+        REFERENCES employees(id) 
+        ON DELETE SET NULL,
+    
+    CONSTRAINT chk_employment_status 
+        CHECK (employment_status IN ('active', 'inactive', 'terminated', 'on_leave')),
+    
+    CONSTRAINT chk_employment_type 
+        CHECK (employment_type IN ('full_time', 'part_time', 'contract', 'intern'))
+);
+
+-- 4. SKILLS TABLE
+CREATE TABLE skills (
+    id SERIAL PRIMARY KEY,
+    skill_name VARCHAR(100) UNIQUE NOT NULL,
+    skill_category VARCHAR(50),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. EMPLOYEE SKILLS TABLE (Many-to-Many)
+CREATE TABLE employee_skills (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    skill_id INTEGER NOT NULL,
+    proficiency_level VARCHAR(20) DEFAULT 'beginner',
+    years_of_experience DECIMAL(3, 1),
+    certified BOOLEAN DEFAULT FALSE,
+    certification_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT fk_skill 
+        FOREIGN KEY (skill_id) 
+        REFERENCES skills(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT chk_proficiency 
+        CHECK (proficiency_level IN ('beginner', 'intermediate', 'advanced', 'expert')),
+    
+    CONSTRAINT unique_employee_skill 
+        UNIQUE (employee_id, skill_id)
+);
+
+-- 6. ATTENDANCE TABLE
+CREATE TABLE attendance (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    attendance_date DATE NOT NULL,
+    check_in_time TIME,
+    check_out_time TIME,
+    status VARCHAR(20) DEFAULT 'present',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT chk_status 
+        CHECK (status IN ('present', 'absent', 'late', 'half_day', 'work_from_home')),
+    
+    CONSTRAINT unique_employee_date 
+        UNIQUE (employee_id, attendance_date)
+);
+
+-- 7. LEAVE TYPES TABLE
+CREATE TABLE leave_types (
+    id SERIAL PRIMARY KEY,
+    leave_type_name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    max_days_per_year INTEGER,
+    is_paid BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8. LEAVE REQUESTS TABLE
+CREATE TABLE leave_requests (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    leave_type_id INTEGER NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    total_days INTEGER NOT NULL,
+    reason TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    approved_by INTEGER,
+    approval_date DATE,
+    rejection_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT fk_leave_type 
+        FOREIGN KEY (leave_type_id) 
+        REFERENCES leave_types(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT fk_approver 
+        FOREIGN KEY (approved_by) 
+        REFERENCES employees(id) 
+        ON DELETE SET NULL,
+    
+    CONSTRAINT chk_status 
+        CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled'))
+);
+
+-- 9. PAYROLL TABLE
+CREATE TABLE payroll (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    pay_period_start DATE NOT NULL,
+    pay_period_end DATE NOT NULL,
+    basic_salary DECIMAL(10, 2) NOT NULL,
+    overtime_hours DECIMAL(5, 2) DEFAULT 0,
+    overtime_pay DECIMAL(10, 2) DEFAULT 0,
+    bonuses DECIMAL(10, 2) DEFAULT 0,
+    deductions DECIMAL(10, 2) DEFAULT 0,
+    net_salary DECIMAL(10, 2) NOT NULL,
+    payment_date DATE,
+    payment_status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT chk_payment_status 
+        CHECK (payment_status IN ('pending', 'processed', 'paid', 'failed'))
+);
+
+-- 10. PERFORMANCE REVIEWS TABLE
+CREATE TABLE performance_reviews (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    reviewer_id INTEGER NOT NULL,
+    review_period_start DATE NOT NULL,
+    review_period_end DATE NOT NULL,
+    review_date DATE NOT NULL,
+    overall_rating DECIMAL(3, 2),
+    technical_skills_rating INTEGER,
+    communication_rating INTEGER,
+    teamwork_rating INTEGER,
+    leadership_rating INTEGER,
+    comments TEXT,
+    goals_next_period TEXT,
+    status VARCHAR(20) DEFAULT 'draft',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT fk_reviewer 
+        FOREIGN KEY (reviewer_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT chk_status 
+        CHECK (status IN ('draft', 'submitted', 'completed')),
+    
+    CONSTRAINT chk_rating_range 
+        CHECK (overall_rating >= 0 AND overall_rating <= 5)
+);
+
+-- 11. TRAINING PROGRAMS TABLE
+CREATE TABLE training_programs (
+    id SERIAL PRIMARY KEY,
+    program_name VARCHAR(100) NOT NULL,
+    description TEXT,
+    duration_hours INTEGER,
+    instructor_name VARCHAR(100),
+    cost DECIMAL(10, 2),
+    start_date DATE,
+    end_date DATE,
+    max_participants INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 12. EMPLOYEE TRAINING TABLE (Many-to-Many)
+CREATE TABLE employee_training (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    training_program_id INTEGER NOT NULL,
+    enrollment_date DATE NOT NULL,
+    completion_date DATE,
+    status VARCHAR(20) DEFAULT 'enrolled',
+    score DECIMAL(5, 2),
+    certificate_issued BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT fk_training 
+        FOREIGN KEY (training_program_id) 
+        REFERENCES training_programs(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT chk_status 
+        CHECK (status IN ('enrolled', 'in_progress', 'completed', 'failed', 'cancelled')),
+    
+    CONSTRAINT unique_employee_training 
+        UNIQUE (employee_id, training_program_id)
+);
+
+-- 13. PROJECTS TABLE
+CREATE TABLE projects (
+    id SERIAL PRIMARY KEY,
+    project_name VARCHAR(100) NOT NULL,
+    project_code VARCHAR(20) UNIQUE NOT NULL,
+    description TEXT,
+    department_id INTEGER,
+    project_manager_id INTEGER,
+    start_date DATE,
+    end_date DATE,
+    budget DECIMAL(12, 2),
+    status VARCHAR(20) DEFAULT 'planned',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_department 
+        FOREIGN KEY (department_id) 
+        REFERENCES departments(id) 
+        ON DELETE SET NULL,
+    
+    CONSTRAINT fk_project_manager 
+        FOREIGN KEY (project_manager_id) 
+        REFERENCES employees(id) 
+        ON DELETE SET NULL,
+    
+    CONSTRAINT chk_status 
+        CHECK (status IN ('planned', 'in_progress', 'on_hold', 'completed', 'cancelled'))
+);
+
+-- 14. PROJECT ASSIGNMENTS TABLE (Many-to-Many)
+CREATE TABLE project_assignments (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    role VARCHAR(100),
+    allocation_percentage INTEGER DEFAULT 100,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT fk_project 
+        FOREIGN KEY (project_id) 
+        REFERENCES projects(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT chk_allocation 
+        CHECK (allocation_percentage > 0 AND allocation_percentage <= 100)
+);
+
+-- 15. BENEFITS TABLE
+CREATE TABLE benefits (
+    id SERIAL PRIMARY KEY,
+    benefit_name VARCHAR(100) NOT NULL,
+    benefit_type VARCHAR(50),
+    description TEXT,
+    cost_to_company DECIMAL(10, 2),
+    cost_to_employee DECIMAL(10, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 16. EMPLOYEE BENEFITS TABLE (Many-to-Many)
+CREATE TABLE employee_benefits (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    benefit_id INTEGER NOT NULL,
+    enrollment_date DATE NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT fk_benefit 
+        FOREIGN KEY (benefit_id) 
+        REFERENCES benefits(id) 
+        ON DELETE CASCADE,
+    
+    CONSTRAINT chk_status 
+        CHECK (status IN ('active', 'inactive', 'pending', 'cancelled')),
+    
+    CONSTRAINT unique_employee_benefit 
+        UNIQUE (employee_id, benefit_id)
+);
+
+-- 17. DOCUMENTS TABLE
+CREATE TABLE documents (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL,
+    document_type VARCHAR(50) NOT NULL,
+    document_name VARCHAR(200) NOT NULL,
+    file_path VARCHAR(500),
+    file_size INTEGER,
+    upload_date DATE DEFAULT CURRENT_DATE,
+    expiry_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employees(id) 
+        ON DELETE CASCADE
+);
+
+-- CREATE INDEXES FOR BETTER PERFORMANCE
+CREATE INDEX idx_employees_department ON employees(department_id);
+CREATE INDEX idx_employees_position ON employees(position_id);
+CREATE INDEX idx_employees_manager ON employees(manager_id);
+CREATE INDEX idx_employees_email ON employees(email);
+CREATE INDEX idx_employees_status ON employees(employment_status);
+
+CREATE INDEX idx_attendance_employee ON attendance(employee_id);
+CREATE INDEX idx_attendance_date ON attendance(attendance_date);
+
+CREATE INDEX idx_leave_requests_employee ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+CREATE INDEX idx_payroll_employee ON payroll(employee_id);
+CREATE INDEX idx_payroll_period ON payroll(pay_period_start, pay_period_end);
+
+CREATE INDEX idx_performance_employee ON performance_reviews(employee_id);
+CREATE INDEX idx_performance_reviewer ON performance_reviews(reviewer_id);
+
+CREATE INDEX idx_project_assignments_employee ON project_assignments(employee_id);
+CREATE INDEX idx_project_assignments_project ON project_assignments(project_id);
+
+-- CREATE TRIGGERS FOR AUTO-UPDATING TIMESTAMPS
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_departments_updated_at
+    BEFORE UPDATE ON departments
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_job_positions_updated_at
+    BEFORE UPDATE ON job_positions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_employees_updated_at
+    BEFORE UPDATE ON employees
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_leave_requests_updated_at
+    BEFORE UPDATE ON leave_requests
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_performance_reviews_updated_at
+    BEFORE UPDATE ON performance_reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_projects_updated_at
+    BEFORE UPDATE ON projects
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ADD FOREIGN KEY TO DEPARTMENTS TABLE (MANAGER_ID)
+ALTER TABLE departments
+ADD CONSTRAINT fk_dept_manager 
+FOREIGN KEY (manager_id) 
+REFERENCES employees(id) 
+ON DELETE SET NULL;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Insert statements
+==========================
+-- 1. INSERT INTO DEPARTMENTS
+INSERT INTO departments (department_name, department_code, description, location, budget) VALUES
+('Human Resources', 'HR001', 'Manages employee relations and recruitment', 'Building A - Floor 2', 500000.00),
+('Information Technology', 'IT001', 'Manages technology infrastructure and software development', 'Building B - Floor 3', 1500000.00),
+('Finance', 'FIN001', 'Handles financial planning and accounting', 'Building A - Floor 1', 800000.00),
+('Marketing', 'MKT001', 'Manages marketing campaigns and brand strategy', 'Building C - Floor 2', 750000.00),
+('Sales', 'SAL001', 'Handles customer acquisition and revenue generation', 'Building C - Floor 1', 1000000.00),
+('Operations', 'OPS001', 'Manages day-to-day business operations', 'Building B - Floor 1', 900000.00),
+('Customer Support', 'CS001', 'Provides customer service and support', 'Building A - Floor 3', 400000.00),
+('Research & Development', 'RND001', 'Focuses on innovation and product development', 'Building B - Floor 4', 2000000.00);
+
+-- 2. INSERT INTO JOB POSITIONS
+INSERT INTO job_positions (position_title, position_code, department_id, description, min_salary, max_salary) VALUES
+('HR Manager', 'POS001', 1, 'Oversees HR department operations', 70000.00, 95000.00),
+('HR Specialist', 'POS002', 1, 'Handles recruitment and employee relations', 45000.00, 65000.00),
+('Software Engineer', 'POS003', 2, 'Develops and maintains software applications', 80000.00, 130000.00),
+('Senior Software Engineer', 'POS004', 2, 'Leads software development projects', 110000.00, 160000.00),
+('IT Support Specialist', 'POS005', 2, 'Provides technical support to employees', 45000.00, 65000.00),
+('Financial Analyst', 'POS006', 3, 'Analyzes financial data and creates reports', 60000.00, 90000.00),
+('Accountant', 'POS007', 3, 'Manages accounting processes and compliance', 50000.00, 75000.00),
+('Finance Manager', 'POS008', 3, 'Oversees financial operations', 85000.00, 120000.00),
+('Marketing Manager', 'POS009', 4, 'Develops and executes marketing strategies', 75000.00, 110000.00),
+('Marketing Specialist', 'POS010', 4, 'Implements marketing campaigns', 50000.00, 70000.00),
+('Sales Representative', 'POS011', 5, 'Sells products and services to customers', 40000.00, 80000.00),
+('Sales Manager', 'POS012', 5, 'Leads sales team and strategy', 80000.00, 120000.00),
+('Operations Manager', 'POS013', 6, 'Manages operational processes', 75000.00, 105000.00),
+('Customer Support Representative', 'POS014', 7, 'Provides customer assistance', 35000.00, 50000.00),
+('Support Manager', 'POS015', 7, 'Oversees customer support team', 60000.00, 85000.00),
+('Research Scientist', 'POS016', 8, 'Conducts research and development', 90000.00, 140000.00),
+('Product Manager', 'POS017', 8, 'Manages product development lifecycle', 95000.00, 145000.00);
+
+-- 3. INSERT INTO EMPLOYEES
+INSERT INTO employees (employee_id, first_name, last_name, email, phone_number, date_of_birth, hire_date, 
+    department_id, position_id, manager_id, salary, employment_status, employment_type, address, city, state, 
+    postal_code, country, emergency_contact_name, emergency_contact_phone) VALUES
+('EMP001', 'John', 'Smith', 'john.smith@company.com', '555-0101', '1985-03-15', '2015-01-10', 1, 1, NULL, 85000.00, 'active', 'full_time', '123 Main St', 'New York', 'NY', '10001', 'USA', 'Jane Smith', '555-0102'),
+('EMP002', 'Sarah', 'Johnson', 'sarah.johnson@company.com', '555-0103', '1990-07-22', '2018-03-15', 1, 2, 1, 55000.00, 'active', 'full_time', '456 Oak Ave', 'New York', 'NY', '10002', 'USA', 'Mike Johnson', '555-0104'),
+('EMP003', 'Michael', 'Williams', 'michael.williams@company.com', '555-0105', '1988-11-30', '2016-06-01', 2, 4, NULL, 135000.00, 'active', 'full_time', '789 Pine St', 'San Francisco', 'CA', '94101', 'USA', 'Emily Williams', '555-0106'),
+('EMP004', 'Emily', 'Brown', 'emily.brown@company.com', '555-0107', '1992-05-18', '2019-09-10', 2, 3, 3, 95000.00, 'active', 'full_time', '321 Elm St', 'San Francisco', 'CA', '94102', 'USA', 'David Brown', '555-0108'),
+('EMP005', 'David', 'Jones', 'david.jones@company.com', '555-0109', '1987-09-25', '2017-02-20', 2, 3, 3, 98000.00, 'active', 'full_time', '654 Maple Dr', 'San Francisco', 'CA', '94103', 'USA', 'Lisa Jones', '555-0110'),
+('EMP006', 'Lisa', 'Garcia', 'lisa.garcia@company.com', '555-0111', '1991-12-08', '2020-01-15', 2, 5, 3, 52000.00, 'active', 'full_time', '987 Cedar Ln', 'San Francisco', 'CA', '94104', 'USA', 'Carlos Garcia', '555-0112'),
+('EMP007', 'Robert', 'Martinez', 'robert.martinez@company.com', '555-0113', '1986-04-12', '2016-08-22', 3, 8, NULL, 105000.00, 'active', 'full_time', '147 Birch Rd', 'Chicago', 'IL', '60601', 'USA', 'Maria Martinez', '555-0114'),
+('EMP008', 'Jennifer', 'Rodriguez', 'jennifer.rodriguez@company.com', '555-0115', '1993-08-30', '2021-04-05', 3, 6, 7, 72000.00, 'active', 'full_time', '258 Spruce Ave', 'Chicago', 'IL', '60602', 'USA', 'Jose Rodriguez', '555-0116'),
+('EMP009', 'William', 'Lee', 'william.lee@company.com', '555-0117', '1989-02-14', '2018-11-12', 3, 7, 7, 63000.00, 'active', 'full_time', '369 Willow St', 'Chicago', 'IL', '60603', 'USA', 'Karen Lee', '555-0118'),
+('EMP010', 'Maria', 'Wilson', 'maria.wilson@company.com', '555-0119', '1994-06-20', '2020-07-01', 4, 9, NULL, 92000.00, 'active', 'full_time', '741 Ash Blvd', 'Los Angeles', 'CA', '90001', 'USA', 'John Wilson', '555-0120'),
+('EMP011', 'James', 'Anderson', 'james.anderson@company.com', '555-0121', '1990-10-05', '2019-05-20', 4, 10, 10, 58000.00, 'active', 'full_time', '852 Poplar Dr', 'Los Angeles', 'CA', '90002', 'USA', 'Susan Anderson', '555-0122'),
+('EMP012', 'Patricia', 'Thomas', 'patricia.thomas@company.com', '555-0123', '1988-01-28', '2017-09-15', 5, 12, NULL, 98000.00, 'active', 'full_time', '963 Cherry Ln', 'Boston', 'MA', '02101', 'USA', 'Richard Thomas', '555-0124'),
+('EMP013', 'Christopher', 'Taylor', 'christopher.taylor@company.com', '555-0125', '1995-03-10', '2021-08-01', 5, 11, 12, 65000.00, 'active', 'full_time', '159 Hickory Rd', 'Boston', 'MA', '02102', 'USA', 'Michelle Taylor', '555-0126'),
+('EMP014', 'Linda', 'Moore', 'linda.moore@company.com', '555-0127', '1992-07-17', '2020-03-10', 5, 11, 12, 62000.00, 'active', 'full_time', '357 Walnut Ave', 'Boston', 'MA', '02103', 'USA', 'Daniel Moore', '555-0128'),
+('EMP015', 'Daniel', 'Jackson', 'daniel.jackson@company.com', '555-0129', '1987-11-22', '2016-12-05', 6, 13, NULL, 88000.00, 'active', 'full_time', '486 Sycamore St', 'Seattle', 'WA', '98101', 'USA', 'Amy Jackson', '555-0130'),
+('EMP016', 'Nancy', 'White', 'nancy.white@company.com', '555-0131', '1991-04-08', '2019-02-18', 7, 15, NULL, 73000.00, 'active', 'full_time', '597 Beech Dr', 'Miami', 'FL', '33101', 'USA', 'Steven White', '555-0132'),
+('EMP017', 'Matthew', 'Harris', 'matthew.harris@company.com', '555-0133', '1996-09-14', '2022-01-20', 7, 14, 16, 42000.00, 'active', 'full_time', '628 Dogwood Ln', 'Miami', 'FL', '33102', 'USA', 'Jessica Harris', '555-0134'),
+('EMP018', 'Betty', 'Martin', 'betty.martin@company.com', '555-0135', '1993-12-25', '2021-06-15', 7, 14, 16, 44000.00, 'active', 'full_time', '739 Redwood Ave', 'Miami', 'FL', '33103', 'USA', 'Robert Martin', '555-0136'),
+('EMP019', 'Joseph', 'Thompson', 'joseph.thompson@company.com', '555-0137', '1986-05-30', '2015-10-08', 8, 17, NULL, 125000.00, 'active', 'full_time', '841 Cypress Rd', 'Austin', 'TX', '73301', 'USA', 'Sarah Thompson', '555-0138'),
+('EMP020', 'Sandra', 'Garcia', 'sandra.garcia@company.com', '555-0139', '1989-08-19', '2018-04-12', 8, 16, 19, 112000.00, 'active', 'full_time', '952 Magnolia St', 'Austin', 'TX', '73302', 'USA', 'Carlos Garcia', '555-0140'),
+('EMP021', 'Thomas', 'Martinez', 'thomas.martinez@company.com', '555-0141', '1994-02-28', '2021-11-01', 2, 3, 3, 92000.00, 'active', 'contract', '163 Chestnut Dr', 'San Francisco', 'CA', '94105', 'USA', 'Angela Martinez', '555-0142'),
+('EMP022', 'Karen', 'Robinson', 'karen.robinson@company.com', '555-0143', '1997-06-15', '2023-03-20', 4, 10, 10, 53000.00, 'active', 'full_time', '274 Fir Ln', 'Los Angeles', 'CA', '90003', 'USA', 'Paul Robinson', '555-0144'),
+('EMP023', 'Charles', 'Clark', 'charles.clark@company.com', '555-0145', '1990-09-03', '2019-07-22', 5, 11, 12, 68000.00, 'active', 'full_time', '385 Palm Ave', 'Boston', 'MA', '02104', 'USA', 'Laura Clark', '555-0146'),
+('EMP024', 'Susan', 'Lewis', 'susan.lewis@company.com', '555-0147', '1998-01-12', '2023-09-05', 7, 14, 16, 39000.00, 'active', 'part_time', '496 Sequoia Rd', 'Miami', 'FL', '33104', 'USA', 'Kevin Lewis', '555-0148'),
+('EMP025', 'Paul', 'Walker', 'paul.walker@company.com', '555-0149', '1985-04-20', '2014-05-15', 2, 4, NULL, 142000.00, 'active', 'full_time', '517 Acacia St', 'San Francisco', 'CA', '94106', 'USA', 'Mary Walker', '555-0150');
+
+-- Update manager_id for departments
+UPDATE departments SET manager_id = 1 WHERE id = 1;
+UPDATE departments SET manager_id = 3 WHERE id = 2;
+UPDATE departments SET manager_id = 7 WHERE id = 3;
+UPDATE departments SET manager_id = 10 WHERE id = 4;
+UPDATE departments SET manager_id = 12 WHERE id = 5;
+UPDATE departments SET manager_id = 15 WHERE id = 6;
+UPDATE departments SET manager_id = 16 WHERE id = 7;
+UPDATE departments SET manager_id = 19 WHERE id = 8;
+
+-- 4. INSERT INTO SKILLS
+INSERT INTO skills (skill_name, skill_category, description) VALUES
+('Python', 'Programming', 'Python programming language'),
+('Java', 'Programming', 'Java programming language'),
+('JavaScript', 'Programming', 'JavaScript programming language'),
+('SQL', 'Database', 'Structured Query Language for database management'),
+('PostgreSQL', 'Database', 'PostgreSQL database administration'),
+('React', 'Frontend', 'React JavaScript library for UI development'),
+('Node.js', 'Backend', 'JavaScript runtime for server-side development'),
+('Project Management', 'Management', 'Project planning and execution'),
+('Team Leadership', 'Management', 'Leading and managing teams'),
+('Communication', 'Soft Skills', 'Effective verbal and written communication'),
+('Data Analysis', 'Analytics', 'Analyzing and interpreting data'),
+('Excel', 'Office', 'Microsoft Excel proficiency'),
+('Financial Modeling', 'Finance', 'Creating financial models and forecasts'),
+('Marketing Strategy', 'Marketing', 'Developing marketing strategies'),
+('SEO/SEM', 'Marketing', 'Search engine optimization and marketing'),
+('Sales Negotiation', 'Sales', 'Negotiating sales deals'),
+('Customer Service', 'Customer Support', 'Providing excellent customer service'),
+('AWS', 'Cloud', 'Amazon Web Services cloud platform'),
+('Docker', 'DevOps', 'Container platform'),
+('Kubernetes', 'DevOps', 'Container orchestration'),
+('Machine Learning', 'AI/ML', 'Machine learning algorithms and applications'),
+('Agile', 'Methodology', 'Agile development methodology'),
+('Scrum', 'Methodology', 'Scrum framework'),
+('Public Speaking', 'Soft Skills', 'Presenting to audiences'),
+('Problem Solving', 'Soft Skills', 'Analytical problem-solving abilities');
+
+-- 5. INSERT INTO EMPLOYEE SKILLS
+INSERT INTO employee_skills (employee_id, skill_id, proficiency_level, years_of_experience, certified) VALUES
+(1, 8, 'expert', 10.0, TRUE),
+(1, 9, 'advanced', 8.0, FALSE),
+(1, 10, 'expert', 12.0, FALSE),
+(2, 10, 'advanced', 5.0, FALSE),
+(2, 12, 'expert', 6.0, TRUE),
+(3, 1, 'expert', 10.0, TRUE),
+(3, 3, 'advanced', 8.0, FALSE),
+(3, 4, 'expert', 9.0, TRUE),
+(3, 18, 'advanced', 5.0, TRUE),
+(3, 8, 'advanced', 7.0, FALSE),
+(4, 1, 'advanced', 4.0, FALSE),
+(4, 6, 'advanced', 3.0, FALSE),
+(4, 7, 'intermediate', 3.0, FALSE),
+(5, 2, 'expert', 6.0, TRUE),
+(5, 4, 'advanced', 5.0, FALSE),
+(5, 22, 'advanced', 4.0, TRUE),
+(6, 4, 'intermediate', 2.0, FALSE),
+(6, 17, 'advanced', 3.0, FALSE),
+(7, 13, 'expert', 9.0, TRUE),
+(7, 12, 'expert', 10.0, TRUE),
+(7, 11, 'advanced', 8.0, FALSE),
+(8, 11, 'advanced', 4.0, FALSE),
+(8, 12, 'advanced', 5.0, FALSE),
+(8, 13, 'intermediate', 3.0, FALSE),
+(9, 12, 'expert', 6.0, TRUE),
+(9, 13, 'advanced', 5.0, FALSE),
+(10, 14, 'expert', 7.0, TRUE),
+(10, 15, 'advanced', 6.0, TRUE),
+(10, 24, 'advanced', 5.0, FALSE),
+(11, 14, 'intermediate', 3.0, FALSE),
+(11, 15, 'intermediate', 2.0, FALSE),
+(12, 16, 'expert', 8.0, TRUE),
+(12, 10, 'advanced', 7.0, FALSE),
+(13, 16, 'advanced', 4.0, FALSE),
+(13, 10, 'intermediate', 3.0, FALSE),
+(14, 16, 'intermediate', 3.0, FALSE),
+(15, 8, 'advanced', 7.0, TRUE),
+(15, 22, 'expert', 6.0, TRUE),
+(16, 17, 'expert', 6.0, TRUE),
+(16, 10, 'advanced', 5.0, FALSE),
+(17, 17, 'intermediate', 2.0, FALSE),
+(18, 17, 'intermediate', 2.0, FALSE),
+(19, 8, 'expert', 11.0, TRUE),
+(19, 21, 'advanced', 7.0, TRUE),
+(20, 21, 'expert', 8.0, TRUE),
+(20, 1, 'advanced', 6.0, FALSE),
+(21, 3, 'advanced', 3.0, FALSE),
+(21, 6, 'advanced', 3.0, FALSE),
+(22, 14, 'beginner', 1.0, FALSE),
+(23, 16, 'intermediate', 3.0, FALSE),
+(24, 17, 'beginner', 1.0, FALSE),
+(25, 1, 'expert', 11.0, TRUE),
+(25, 19, 'advanced', 8.0, TRUE),
+(25, 20, 'advanced', 7.0, FALSE);
+
+-- 6. INSERT INTO ATTENDANCE
+INSERT INTO attendance (employee_id, attendance_date, check_in_time, check_out_time, status) VALUES
+-- Recent week data for multiple employees
+(1, '2026-01-27', '08:55:00', '17:30:00', 'present'),
+(1, '2026-01-28', '09:02:00', '17:45:00', 'present'),
+(1, '2026-01-29', '08:50:00', '17:25:00', 'present'),
+(2, '2026-01-27', '09:05:00', '17:15:00', 'present'),
+(2, '2026-01-28', '09:00:00', '17:00:00', 'present'),
+(2, '2026-01-29', '09:10:00', '17:20:00', 'present'),
+(3, '2026-01-27', '08:45:00', '18:00:00', 'present'),
+(3, '2026-01-28', '08:50:00', '18:15:00', 'present'),
+(3, '2026-01-29', '08:55:00', '17:50:00', 'present'),
+(4, '2026-01-27', '09:00:00', '17:30:00', 'present'),
+(4, '2026-01-28', NULL, NULL, 'work_from_home'),
+(4, '2026-01-29', '09:05:00', '17:35:00', 'present'),
+(5, '2026-01-27', '09:15:00', '17:30:00', 'late'),
+(5, '2026-01-28', '09:00:00', '17:00:00', 'present'),
+(5, '2026-01-29', '09:20:00', '17:15:00', 'late'),
+(6, '2026-01-27', '09:00:00', '17:00:00', 'present'),
+(6, '2026-01-28', '09:05:00', '17:10:00', 'present'),
+(6, '2026-01-29', NULL, NULL, 'absent'),
+(7, '2026-01-27', '08:30:00', '17:30:00', 'present'),
+(7, '2026-01-28', '08:35:00', '17:25:00', 'present'),
+(7, '2026-01-29', '08:40:00', '17:35:00', 'present'),
+(8, '2026-01-27', '09:00:00', '17:00:00', 'present'),
+(8, '2026-01-28', '09:00:00', '13:00:00', 'half_day'),
+(8, '2026-01-29', '09:00:00', '17:00:00', 'present'),
+(10, '2026-01-27', '09:10:00', '17:40:00', 'present'),
+(10, '2026-01-28', '09:05:00', '17:30:00', 'present'),
+(10, '2026-01-29', '09:00:00', '17:45:00', 'present');
+
+-- 7. INSERT INTO LEAVE TYPES
+INSERT INTO leave_types (leave_type_name, description, max_days_per_year, is_paid) VALUES
+('Annual Leave', 'Standard annual vacation leave', 20, TRUE),
+('Sick Leave', 'Medical sick leave', 15, TRUE),
+('Personal Leave', 'Personal time off', 5, TRUE),
+('Maternity Leave', 'Maternity leave for new mothers', 90, TRUE),
+('Paternity Leave', 'Paternity leave for new fathers', 14, TRUE),
+('Bereavement Leave', 'Leave for family bereavement', 5, TRUE),
+('Unpaid Leave', 'Unpaid time off', NULL, FALSE),
+('Study Leave', 'Educational or training purposes', 10, TRUE),
+('Sabbatical', 'Extended leave for personal development', 180, FALSE),
+('Compensatory Leave', 'Time off in lieu of overtime worked', NULL, TRUE);
+
+-- 8. INSERT INTO LEAVE REQUESTS
+INSERT INTO leave_requests (employee_id, leave_type_id, start_date, end_date, total_days, reason, status, approved_by, approval_date) VALUES
+(2, 1, '2026-02-10', '2026-02-14', 5, 'Family vacation', 'approved', 1, '2026-01-20'),
+(4, 2, '2026-01-27', '2026-01-29', 3, 'Flu symptoms', 'approved', 3, '2026-01-26'),
+(5, 1, '2026-03-01', '2026-03-07', 7, 'Personal travel', 'pending', NULL, NULL),
+(8, 3, '2026-02-05', '2026-02-05', 1, 'Personal matters', 'approved', 7, '2026-01-28'),
+(11, 1, '2026-02-20', '2026-02-24', 5, 'Spring break', 'pending', NULL, NULL),
+(13, 2, '2026-01-29', '2026-01-30', 2, 'Medical appointment', 'approved', 12, '2026-01-28'),
+(17, 1, '2026-04-01', '2026-04-10', 10, 'Extended vacation', 'pending', NULL, NULL),
+(6, 2, '2026-01-29', '2026-01-31', 3, 'Cold and fever', 'approved', 3, '2026-01-29'),
+(14, 1, '2026-03-15', '2026-03-17', 3, 'Long weekend trip', 'rejected', 12, '2026-01-25'),
+(20, 8, '2026-02-12', '2026-02-16', 5, 'Attending conference', 'approved', 19, '2026-01-22');
+
+-- 9. INSERT INTO PAYROLL
+INSERT INTO payroll (employee_id, pay_period_start, pay_period_end, basic_salary, overtime_hours, 
+    overtime_pay, bonuses, deductions, net_salary, payment_date, payment_status) VALUES
+(1, '2025-12-01', '2025-12-31', 7083.33, 0, 0, 500.00, 850.00, 6733.33, '2026-01-05', 'paid'),
+(2, '2025-12-01', '2025-12-31', 4583.33, 0, 0, 200.00, 550.00, 4233.33, '2026-01-05', 'paid'),
+(3, '2025-12-01', '2025-12-31', 11250.00, 5.0, 432.69, 1000.00, 1350.00, 11332.69, '2026-01-05', 'paid'),
+(4, '2025-12-01', '2025-12-31', 7916.67, 0, 0, 500.00, 950.00, 7466.67, '2026-01-05', 'paid'),
+(5, '2025-12-01', '2025-12-31', 8166.67, 3.0, 235.10, 500.00, 980.00, 7921.77, '2026-01-05', 'paid'),
+(7, '2025-12-01', '2025-12-31', 8750.00, 0, 0, 800.00, 1050.00, 8500.00, '2026-01-05', 'paid'),
+(10, '2025-12-01', '2025-12-31', 7666.67, 0, 0, 600.00, 920.00, 7346.67, '2026-01-05', 'paid'),
+(12, '2025-12-01', '2025-12-31', 8166.67, 0, 0, 750.00, 980.00, 7936.67, '2026-01-05', 'paid'),
+(1, '2026-01-01', '2026-01-31', 7083.33, 0, 0, 0, 850.00, 6233.33, NULL, 'pending'),
+(2, '2026-01-01', '2026-01-31', 4583.33, 0, 0, 0, 550.00, 4033.33, NULL, 'pending'),
+(3, '2026-01-01', '2026-01-31', 11250.00, 8.0, 692.31, 0, 1350.00, 10592.31, NULL, 'pending'),
+(4, '2026-01-01', '2026-01-31', 7916.67, 0, 0, 0, 950.00, 6966.67, NULL, 'pending');
+
+-- 10. INSERT INTO PERFORMANCE REVIEWS
+INSERT INTO performance_reviews (employee_id, reviewer_id, review_period_start, review_period_end, 
+    review_date, overall_rating, technical_skills_rating, communication_rating, teamwork_rating, 
+    leadership_rating, comments, goals_next_period, status) VALUES
+(2, 1, '2025-07-01', '2025-12-31', '2026-01-10', 4.2, 4, 4, 5, 3, 
+    'Sarah has shown excellent performance in recruitment and employee engagement. Strong team player.',
+    'Focus on developing leadership skills and mentor junior team members.',
+    'completed'),
+(4, 3, '2025-07-01', '2025-12-31', '2026-01-12', 4.5, 5, 4, 4, 4,
+    'Outstanding technical skills and consistent delivery. Great contributor to team projects.',
+    'Lead at least one major project and continue skill development in cloud technologies.',
+    'completed'),
+(5, 3, '2025-07-01', '2025-12-31', '2026-01-12', 4.0, 4, 4, 4, 3,
+    'Solid performance with good technical abilities. Needs improvement in time management.',
+    'Improve project estimation and delivery timelines.',
+    'completed'),
+(8, 7, '2025-07-01', '2025-12-31', '2026-01-15', 4.3, 4, 5, 4, 4,
+    'Excellent analytical skills and attention to detail. Good communicator.',
+    'Take on more complex financial modeling projects.',
+    'completed'),
+(11, 10, '2025-07-01', '2025-12-31', '2026-01-18', 3.8, 3, 4, 4, 3,
+    'Good performance overall. Needs to improve SEO campaign results.',
+    'Complete digital marketing certification and improve campaign ROI.',
+    'completed'),
+(13, 12, '2025-07-01', '2025-12-31', '2026-01-20', 4.4, 4, 5, 5, 4,
+    'Excellent sales performance, exceeded targets by 20%. Great team collaboration.',
+    'Mentor new sales representatives and aim for regional sales award.',
+    'completed'),
+(17, 16, '2025-07-01', '2025-12-31', '2026-01-22', 3.5, 3, 4, 3, 2,
+    'Meets expectations but needs improvement in response time and product knowledge.',
+    'Complete product training and improve average response time.',
+    'completed'),
+(21, 3, '2025-07-01', '2025-12-31', '2026-01-14', 4.1, 4, 4, 4, 3,
+    'Strong technical skills as a contractor. Good integration with the team.',
+    'Continue contributing to key projects and knowledge sharing.',
+    'completed');
+
+-- 11. INSERT INTO TRAINING PROGRAMS
+INSERT INTO training_programs (program_name, description, duration_hours, instructor_name, cost, 
+    start_date, end_date, max_participants) VALUES
+('Advanced Python Programming', 'Deep dive into Python advanced concepts and frameworks', 40, 'Dr. Alan Chen', 1200.00, '2026-02-15', '2026-03-15', 20),
+('Leadership Essentials', 'Fundamentals of leadership and people management', 24, 'Sarah Mitchell', 800.00, '2026-02-01', '2026-02-28', 15),
+('Cloud Architecture with AWS', 'Comprehensive AWS cloud architecture training', 60, 'Mark Stevens', 2500.00, '2026-03-01', '2026-04-30', 12),
+('Data Analytics with SQL', 'Advanced SQL and data analysis techniques', 32, 'Jennifer Park', 950.00, '2026-02-10', '2026-03-10', 25),
+('Digital Marketing Strategies', 'Modern digital marketing and SEO techniques', 28, 'Robert Clark', 750.00, '2026-02-20', '2026-03-20', 18),
+('Agile Project Management', 'Scrum and Agile methodologies for project management', 20, 'Linda Foster', 600.00, '2026-03-05', '2026-03-26', 20),
+('Customer Service Excellence', 'Best practices in customer service and support', 16, 'David Wong', 500.00, '2026-02-12', '2026-02-27', 30),
+('Financial Modeling Advanced', 'Complex financial modeling and forecasting', 36, 'Michael Ross', 1400.00, '2026-03-10', '2026-04-20', 10),
+('Machine Learning Fundamentals', 'Introduction to ML algorithms and applications', 48, 'Dr. Lisa Chen', 1800.00, '2026-04-01', '2026-05-31', 15),
+('Effective Communication Skills', 'Public speaking and professional communication', 12, 'Patricia Adams', 400.00, '2026-02-05', '2026-02-19', 25);
+
+-- 12. INSERT INTO EMPLOYEE TRAINING
+INSERT INTO employee_training (employee_id, training_program_id, enrollment_date, completion_date, 
+    status, score, certificate_issued) VALUES
+(4, 1, '2026-01-20', NULL, 'enrolled', NULL, FALSE),
+(5, 1, '2026-01-20', NULL, 'enrolled', NULL, FALSE),
+(21, 1, '2026-01-22', NULL, 'enrolled', NULL, FALSE),
+(1, 2, '2026-01-15', NULL, 'enrolled', NULL, FALSE),
+(10, 2, '2026-01-15', NULL, 'enrolled', NULL, FALSE),
+(12, 2, '2026-01-16', NULL, 'enrolled', NULL, FALSE),
+(3, 3, '2026-01-18', NULL, 'enrolled', NULL, FALSE),
+(25, 3, '2026-01-19', NULL, 'enrolled', NULL, FALSE),
+(8, 4, '2026-01-17', NULL, 'enrolled', NULL, FALSE),
+(9, 4, '2026-01-17', NULL, 'enrolled', NULL, FALSE),
+(11, 5, '2026-01-21', NULL, 'enrolled', NULL, FALSE),
+(22, 5, '2026-01-23', NULL, 'enrolled', NULL, FALSE),
+(15, 6, '2026-01-25', NULL, 'enrolled', NULL, FALSE),
+(19, 6, '2026-01-26', NULL, 'enrolled', NULL, FALSE),
+(17, 7, '2025-12-01', '2025-12-16', 'completed', 88.50, TRUE),
+(18, 7, '2025-12-01', '2025-12-16', 'completed', 92.00, TRUE),
+(24, 7, '2026-01-10', NULL, 'in_progress', NULL, FALSE),
+(7, 8, '2025-11-15', '2025-12-30', 'completed', 95.00, TRUE),
+(8, 8, '2025-11-15', '2025-12-30', 'completed', 89.00, TRUE),
+(20, 9, '2026-01-28', NULL, 'enrolled', NULL, FALSE);
+
+-- 13. INSERT INTO PROJECTS
+INSERT INTO projects (project_name, project_code, description, department_id, project_manager_id, 
+    start_date, end_date, budget, status) VALUES
+('Customer Portal Redesign', 'PRJ001', 'Complete redesign of customer-facing web portal', 2, 3, '2026-01-15', '2026-06-30', 250000.00, 'in_progress'),
+('CRM Implementation', 'PRJ002', 'Implementation of new CRM system company-wide', 2, 25, '2025-11-01', '2026-04-30', 180000.00, 'in_progress'),
+('Marketing Campaign 2026', 'PRJ003', 'Annual marketing campaign for new product launch', 4, 10, '2026-02-01', '2026-08-31', 120000.00, 'planned'),
+('Financial System Upgrade', 'PRJ004', 'Upgrade to new financial management system', 3, 7, '2026-01-10', '2026-05-31', 150000.00, 'in_progress'),
+('Sales Training Program', 'PRJ005', 'Comprehensive sales training initiative', 5, 12, '2026-02-15', '2026-07-15', 75000.00, 'planned'),
+('AI Research Initiative', 'PRJ006', 'Research into AI applications for products', 8, 19, '2025-09-01', '2026-12-31', 500000.00, 'in_progress'),
+('Mobile App Development', 'PRJ007', 'Development of companion mobile application', 2, 3, '2026-03-01', '2026-10-31', 300000.00, 'planned'),
+('Operations Optimization', 'PRJ008', 'Process improvement and automation project', 6, 15, '2026-01-20', '2026-06-30', 95000.00, 'in_progress'),
+('Customer Support Platform', 'PRJ009', 'New ticketing and support management system', 7, 16, '2025-12-01', '2026-05-31', 125000.00, 'in_progress'),
+('Data Analytics Platform', 'PRJ010', 'Enterprise data analytics and BI platform', 2, 25, '2026-02-01', '2026-11-30', 400000.00, 'planned');
+
+-- 14. INSERT INTO PROJECT ASSIGNMENTS
+INSERT INTO project_assignments (employee_id, project_id, role, allocation_percentage, start_date, end_date) VALUES
+(3, 1, 'Project Manager', 100, '2026-01-15', '2026-06-30'),
+(4, 1, 'Frontend Developer', 80, '2026-01-15', '2026-06-30'),
+(5, 1, 'Backend Developer', 80, '2026-01-15', '2026-06-30'),
+(6, 1, 'QA Engineer', 60, '2026-02-01', '2026-06-30'),
+(25, 2, 'Project Manager', 100, '2025-11-01', '2026-04-30'),
+(4, 2, 'Technical Lead', 20, '2025-11-01', '2026-04-30'),
+(21, 2, 'Developer', 100, '2025-11-01', '2026-04-30'),
+(10, 3, 'Marketing Manager', 80, '2026-02-01', '2026-08-31'),
+(11, 3, 'Marketing Specialist', 100, '2026-02-01', '2026-08-31'),
+(22, 3, 'Marketing Specialist', 100, '2026-02-01', '2026-08-31'),
+(7, 4, 'Project Sponsor', 30, '2026-01-10', '2026-05-31'),
+(8, 4, 'Financial Analyst', 100, '2026-01-10', '2026-05-31'),
+(9, 4, 'Accountant', 80, '2026-01-10', '2026-05-31'),
+(19, 6, 'Project Manager', 100, '2025-09-01', '2026-12-31'),
+(20, 6, 'Research Scientist', 100, '2025-09-01', '2026-12-31'),
+(15, 8, 'Operations Manager', 70, '2026-01-20', '2026-06-30'),
+(16, 9, 'Project Manager', 80, '2025-12-01', '2026-05-31'),
+(17, 9, 'Support Representative', 60, '2025-12-01', '2026-05-31'),
+(18, 9, 'Support Representative', 60, '2025-12-01', '2026-05-31');
+
+-- 15. INSERT INTO BENEFITS
+INSERT INTO benefits (benefit_name, benefit_type, description, cost_to_company, cost_to_employee) VALUES
+('Health Insurance', 'Medical', 'Comprehensive health insurance coverage', 500.00, 100.00),
+('Dental Insurance', 'Medical', 'Dental coverage including preventive care', 50.00, 20.00),
+('Vision Insurance', 'Medical', 'Vision care and eyewear coverage', 30.00, 10.00),
+('Life Insurance', 'Insurance', 'Life insurance policy', 40.00, 0.00),
+('401(k) Matching', 'Retirement', 'Company match up to 5% of salary', 0.00, 0.00),
+('Gym Membership', 'Wellness', 'Subsidized gym membership', 50.00, 25.00),
+('Professional Development', 'Education', 'Annual budget for courses and certifications', 2000.00, 0.00),
+('Commuter Benefits', 'Transportation', 'Transit or parking subsidies', 150.00, 0.00),
+('Employee Assistance Program', 'Wellness', 'Counseling and support services', 30.00, 0.00),
+('Flexible Spending Account', 'Financial', 'Pre-tax account for medical expenses', 0.00, 0.00),
+('Paid Parental Leave', 'Leave', 'Extended paid leave for new parents', 0.00, 0.00),
+('Stock Options', 'Financial', 'Company stock option plan', 0.00, 0.00),
+('Tuition Reimbursement', 'Education', 'Reimbursement for degree programs', 5000.00, 0.00),
+('Remote Work Stipend', 'Work', 'Monthly allowance for home office setup', 100.00, 0.00);
+
+-- 16. INSERT INTO EMPLOYEE BENEFITS
+INSERT INTO employee_benefits (employee_id, benefit_id, enrollment_date, status) VALUES
+(1, 1, '2015-01-10', 'active'),
+(1, 2, '2015-01-10', 'active'),
+(1, 3, '2015-01-10', 'active'),
+(1, 4, '2015-01-10', 'active'),
+(1, 5, '2015-02-01', 'active'),
+(1, 6, '2015-03-01', 'active'),
+(2, 1, '2018-03-15', 'active'),
+(2, 2, '2018-03-15', 'active'),
+(2, 5, '2018-04-01', 'active'),
+(2, 8, '2018-03-15', 'active'),
+(3, 1, '2016-06-01', 'active'),
+(3, 2, '2016-06-01', 'active'),
+(3, 3, '2016-06-01', 'active'),
+(3, 4, '2016-06-01', 'active'),
+(3, 5, '2016-07-01', 'active'),
+(3, 7, '2016-06-01', 'active'),
+(3, 14, '2020-04-01', 'active'),
+(4, 1, '2019-09-10', 'active'),
+(4, 5, '2019-10-01', 'active'),
+(4, 6, '2020-01-01', 'active'),
+(5, 1, '2017-02-20', 'active'),
+(5, 2, '2017-02-20', 'active'),
+(5, 5, '2017-03-01', 'active'),
+(7, 1, '2016-08-22', 'active'),
+(7, 2, '2016-08-22', 'active'),
+(7, 3, '2016-08-22', 'active'),
+(7, 4, '2016-08-22', 'active'),
+(7, 5, '2016-09-01', 'active'),
+(7, 12, '2017-01-01', 'active'),
+(10, 1, '2020-07-01', 'active'),
+(10, 5, '2020-08-01', 'active'),
+(10, 7, '2020-07-01', 'active'),
+(12, 1, '2017-09-15', 'active'),
+(12, 2, '2017-09-15', 'active'),
+(12, 5, '2017-10-01', 'active'),
+(12, 12, '2018-01-01', 'active'),
+(19, 1, '2015-10-08', 'active'),
+(19, 2, '2015-10-08', 'active'),
+(19, 3, '2015-10-08', 'active'),
+(19, 4, '2015-10-08', 'active'),
+(19, 5, '2015-11-01', 'active'),
+(19, 7, '2015-10-08', 'active'),
+(19, 12, '2016-01-01', 'active'),
+(19, 13, '2020-01-01', 'active');
+
+-- 17. INSERT INTO DOCUMENTS
+INSERT INTO documents (employee_id, document_type, document_name, file_path, file_size, upload_date, expiry_date) VALUES
+(1, 'Resume', 'John_Smith_Resume.pdf', '/documents/employees/emp001/resume.pdf', 245680, '2015-01-05', NULL),
+(1, 'ID Proof', 'Drivers_License.pdf', '/documents/employees/emp001/id_proof.pdf', 125340, '2015-01-05', '2029-03-15'),
+(1, 'Contract', 'Employment_Contract_2015.pdf', '/documents/employees/emp001/contract_2015.pdf', 387920, '2015-01-10', NULL),
+(2, 'Resume', 'Sarah_Johnson_Resume.pdf', '/documents/employees/emp002/resume.pdf', 198760, '2018-03-10', NULL),
+(2, 'ID Proof', 'Passport.pdf', '/documents/employees/emp002/id_proof.pdf', 156200, '2018-03-10', '2028-07-22'),
+(2, 'Contract', 'Employment_Contract_2018.pdf', '/documents/employees/emp002/contract_2018.pdf', 345670, '2018-03-15', NULL),
+(3, 'Resume', 'Michael_Williams_Resume.pdf', '/documents/employees/emp003/resume.pdf', 312450, '2016-05-25', NULL),
+(3, 'Certification', 'AWS_Certificate.pdf', '/documents/employees/emp003/aws_cert.pdf', 89340, '2021-06-15', '2027-06-15'),
+(3, 'Contract', 'Employment_Contract_2016.pdf', '/documents/employees/emp003/contract_2016.pdf', 398120, '2016-06-01', NULL),
+(4, 'Resume', 'Emily_Brown_Resume.pdf', '/documents/employees/emp004/resume.pdf', 267890, '2019-09-05', NULL),
+(4, 'ID Proof', 'Drivers_License.pdf', '/documents/employees/emp004/id_proof.pdf', 134560, '2019-09-05', '2027-05-18'),
+(5, 'Resume', 'David_Jones_Resume.pdf', '/documents/employees/emp005/resume.pdf', 221340, '2017-02-15', NULL),
+(5, 'Certification', 'Java_Certification.pdf', '/documents/employees/emp005/java_cert.pdf', 94230, '2020-03-10', NULL),
+(7, 'Resume', 'Robert_Martinez_Resume.pdf', '/documents/employees/emp007/resume.pdf', 289670, '2016-08-15', NULL),
+(7, 'Contract', 'Employment_Contract_2016.pdf', '/documents/employees/emp007/contract_2016.pdf', 412350, '2016-08-22', NULL),
+(7, 'Certification', 'CPA_License.pdf', '/documents/employees/emp007/cpa_cert.pdf', 156780, '2018-05-20', '2028-05-20'),
+(10, 'Resume', 'Maria_Wilson_Resume.pdf', '/documents/employees/emp010/resume.pdf', 234560, '2020-06-25', NULL),
+(12, 'Resume', 'Patricia_Thomas_Resume.pdf', '/documents/employees/emp012/resume.pdf', 267340, '2017-09-10', NULL),
+(19, 'Resume', 'Joseph_Thompson_Resume.pdf', '/documents/employees/emp019/resume.pdf', 298450, '2015-10-01', NULL),
+(19, 'Contract', 'Employment_Contract_2015.pdf', '/documents/employees/emp019/contract_2015.pdf', 423890, '2015-10-08', NULL),
+(20, 'Resume', 'Sandra_Garcia_Resume.pdf', '/documents/employees/emp020/resume.pdf', 245120, '2018-04-05', NULL),
+(20, 'Certification', 'Machine_Learning_Certificate.pdf', '/documents/employees/emp020/ml_cert.pdf', 102340, '2022-08-15', NULL),
+(25, 'Resume', 'Paul_Walker_Resume.pdf', '/documents/employees/emp025/resume.pdf', 312890, '2014-05-10', NULL),
+(25, 'Contract', 'Employment_Contract_2014.pdf', '/documents/employees/emp025/contract_2014.pdf', 445670, '2014-05-15', NULL),
+(25, 'Certification', 'Docker_Certification.pdf', '/documents/employees/emp025/docker_cert.pdf', 87650, '2021-11-20', '2027-11-20');

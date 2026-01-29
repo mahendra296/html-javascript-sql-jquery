@@ -5,7 +5,7 @@ CREATE TYPE address_type AS ENUM ('billing', 'shipping', 'both');
 
 -- Customers table
 CREATE TABLE customers (
-    customer_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     first_name VARCHAR(100) NOT NULL,
@@ -18,8 +18,8 @@ CREATE TABLE customers (
 
 -- Customer addresses table
 CREATE TABLE customer_addresses (
-    address_id SERIAL PRIMARY KEY,
-    customer_id INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     address_type address_type NOT NULL,
     street_address VARCHAR(255) NOT NULL,
     apartment VARCHAR(50),
@@ -34,17 +34,17 @@ CREATE TABLE customer_addresses (
 
 -- Categories table
 CREATE TABLE categories (
-    category_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     category_name VARCHAR(100) NOT NULL,
-    parent_category_id INTEGER REFERENCES categories(category_id) ON DELETE SET NULL,
+    parent_category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Products table
 CREATE TABLE products (
-    product_id SERIAL PRIMARY KEY,
-    category_id INTEGER REFERENCES categories(category_id) ON DELETE SET NULL,
+    id SERIAL PRIMARY KEY,
+    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
     product_name VARCHAR(255) NOT NULL,
     description TEXT,
     price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
@@ -58,10 +58,10 @@ CREATE TABLE products (
 
 -- Orders table
 CREATE TABLE orders (
-    order_id SERIAL PRIMARY KEY,
-    customer_id INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE RESTRICT,
-    billing_address_id INTEGER REFERENCES customer_addresses(address_id) ON DELETE RESTRICT,
-    shipping_address_id INTEGER REFERENCES customer_addresses(address_id) ON DELETE RESTRICT,
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+    billing_address_id INTEGER REFERENCES customer_addresses(id) ON DELETE RESTRICT,
+    shipping_address_id INTEGER REFERENCES customer_addresses(id) ON DELETE RESTRICT,
     order_status order_status DEFAULT 'pending',
     payment_status payment_status DEFAULT 'pending',
     subtotal DECIMAL(10, 2) NOT NULL CHECK (subtotal >= 0),
@@ -78,9 +78,9 @@ CREATE TABLE orders (
 
 -- Order items table
 CREATE TABLE order_items (
-    order_item_id SERIAL PRIMARY KEY,
-    order_id INTEGER NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
-    product_id INTEGER NOT NULL REFERENCES products(product_id) ON DELETE RESTRICT,
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     unit_price DECIMAL(10, 2) NOT NULL CHECK (unit_price >= 0),
     subtotal DECIMAL(10, 2) NOT NULL CHECK (subtotal >= 0),
@@ -89,8 +89,8 @@ CREATE TABLE order_items (
 
 -- Payments table
 CREATE TABLE payments (
-    payment_id SERIAL PRIMARY KEY,
-    order_id INTEGER NOT NULL REFERENCES orders(order_id) ON DELETE RESTRICT,
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
     payment_method VARCHAR(50) NOT NULL,
     payment_status payment_status DEFAULT 'pending',
     transaction_id VARCHAR(255) UNIQUE,
@@ -101,9 +101,9 @@ CREATE TABLE payments (
 
 -- Shopping cart table
 CREATE TABLE shopping_cart (
-    cart_id SERIAL PRIMARY KEY,
-    customer_id INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
-    product_id INTEGER NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(customer_id, product_id)
@@ -111,9 +111,9 @@ CREATE TABLE shopping_cart (
 
 -- Product reviews table
 CREATE TABLE product_reviews (
-    review_id SERIAL PRIMARY KEY,
-    product_id INTEGER NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
-    customer_id INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
     review_text TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -155,3 +155,162 @@ CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products
 
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+	
+	
+	
+	
+	
+	
+Insert statment
+=====================================
+-- Insert sample customers
+INSERT INTO customers (email, password_hash, first_name, last_name, phone, is_active) VALUES
+('john.doe@email.com', '$2a$10$abcdefghijklmnopqrstuvwxyz123456', 'John', 'Doe', '+1-555-0101', TRUE),
+('jane.smith@email.com', '$2a$10$bcdefghijklmnopqrstuvwxyz234567', 'Jane', 'Smith', '+1-555-0102', TRUE),
+('bob.johnson@email.com', '$2a$10$cdefghijklmnopqrstuvwxyz345678', 'Bob', 'Johnson', '+1-555-0103', TRUE),
+('alice.williams@email.com', '$2a$10$defghijklmnopqrstuvwxyz456789', 'Alice', 'Williams', '+1-555-0104', TRUE),
+('charlie.brown@email.com', '$2a$10$efghijklmnopqrstuvwxyz567890', 'Charlie', 'Brown', '+1-555-0105', TRUE),
+('diana.miller@email.com', '$2a$10$fghijklmnopqrstuvwxyz678901', 'Diana', 'Miller', '+1-555-0106', TRUE),
+('edward.davis@email.com', '$2a$10$ghijklmnopqrstuvwxyz789012', 'Edward', 'Davis', '+1-555-0107', TRUE),
+('fiona.garcia@email.com', '$2a$10$hijklmnopqrstuvwxyz890123', 'Fiona', 'Garcia', '+1-555-0108', TRUE);
+
+-- Insert customer addresses
+INSERT INTO customer_addresses (customer_id, address_type, street_address, apartment, city, state, postal_code, country, is_default) VALUES
+(1, 'both', '123 Main Street', 'Apt 4B', 'New York', 'NY', '10001', 'USA', TRUE),
+(1, 'shipping', '456 Oak Avenue', NULL, 'Brooklyn', 'NY', '11201', 'USA', FALSE),
+(2, 'both', '789 Pine Road', 'Suite 200', 'Los Angeles', 'CA', '90001', 'USA', TRUE),
+(3, 'billing', '321 Elm Street', NULL, 'Chicago', 'IL', '60601', 'USA', TRUE),
+(3, 'shipping', '654 Maple Drive', 'Unit 5', 'Chicago', 'IL', '60602', 'USA', FALSE),
+(4, 'both', '987 Cedar Lane', NULL, 'Houston', 'TX', '77001', 'USA', TRUE),
+(5, 'both', '147 Birch Boulevard', 'Apt 12', 'Phoenix', 'AZ', '85001', 'USA', TRUE),
+(6, 'both', '258 Spruce Court', NULL, 'Philadelphia', 'PA', '19101', 'USA', TRUE),
+(7, 'both', '369 Walnut Way', 'Floor 3', 'San Antonio', 'TX', '78201', 'USA', TRUE),
+(8, 'both', '741 Cherry Circle', NULL, 'San Diego', 'CA', '92101', 'USA', TRUE);
+
+-- Insert categories
+INSERT INTO categories (category_name, parent_category_id, description) VALUES
+('Electronics', NULL, 'Electronic devices and gadgets'),
+('Clothing', NULL, 'Apparel and fashion items'),
+('Home & Garden', NULL, 'Home improvement and garden supplies'),
+('Books', NULL, 'Books and publications'),
+('Sports & Outdoors', NULL, 'Sports equipment and outdoor gear'),
+('Computers', 1, 'Computers and computer accessories'),
+('Mobile Phones', 1, 'Smartphones and mobile devices'),
+('Audio', 1, 'Headphones, speakers, and audio equipment'),
+('Men''s Clothing', 2, 'Clothing for men'),
+('Women''s Clothing', 2, 'Clothing for women'),
+('Furniture', 3, 'Home furniture'),
+('Kitchen', 3, 'Kitchen appliances and utensils'),
+('Fiction', 4, 'Fiction books'),
+('Non-Fiction', 4, 'Non-fiction books'),
+('Fitness', 5, 'Fitness equipment');
+
+-- Insert products
+INSERT INTO products (category_id, product_name, description, price, stock_quantity, sku, image_url, is_active) VALUES
+(6, 'Dell XPS 15 Laptop', '15.6" laptop with Intel i7 processor, 16GB RAM, 512GB SSD', 1299.99, 25, 'DELL-XPS15-001', 'https://example.com/images/dell-xps15.jpg', TRUE),
+(6, 'MacBook Pro 14"', 'Apple M2 chip, 16GB RAM, 512GB SSD', 1999.99, 15, 'APPLE-MBP14-001', 'https://example.com/images/macbook-pro.jpg', TRUE),
+(7, 'iPhone 15 Pro', '256GB, Titanium Blue', 999.99, 50, 'APPLE-IP15P-256', 'https://example.com/images/iphone15pro.jpg', TRUE),
+(7, 'Samsung Galaxy S24', '256GB, Phantom Black', 899.99, 40, 'SAMS-GS24-256', 'https://example.com/images/galaxy-s24.jpg', TRUE),
+(8, 'Sony WH-1000XM5 Headphones', 'Wireless noise-cancelling headphones', 399.99, 60, 'SONY-WH1000XM5', 'https://example.com/images/sony-headphones.jpg', TRUE),
+(8, 'Bose QuietComfort Earbuds', 'True wireless earbuds with ANC', 279.99, 75, 'BOSE-QCEB-001', 'https://example.com/images/bose-earbuds.jpg', TRUE),
+(9, 'Men''s Casual Shirt', 'Cotton blend, blue, sizes S-XXL', 39.99, 100, 'SHIRT-MEN-BLU-001', 'https://example.com/images/mens-shirt.jpg', TRUE),
+(9, 'Men''s Denim Jeans', 'Classic fit, dark wash', 59.99, 80, 'JEANS-MEN-DRK-001', 'https://example.com/images/mens-jeans.jpg', TRUE),
+(10, 'Women''s Summer Dress', 'Floral print, sizes XS-XL', 49.99, 65, 'DRESS-WOM-FLR-001', 'https://example.com/images/womens-dress.jpg', TRUE),
+(10, 'Women''s Yoga Pants', 'High-waist, black, moisture-wicking', 44.99, 90, 'YOGA-WOM-BLK-001', 'https://example.com/images/yoga-pants.jpg', TRUE),
+(11, 'Modern Office Chair', 'Ergonomic design with lumbar support', 249.99, 35, 'CHAIR-OFF-ERG-001', 'https://example.com/images/office-chair.jpg', TRUE),
+(11, 'Coffee Table', 'Wooden, rustic style, 48" x 24"', 179.99, 20, 'TABLE-COF-WOD-001', 'https://example.com/images/coffee-table.jpg', TRUE),
+(12, 'Stainless Steel Cookware Set', '10-piece professional grade set', 299.99, 30, 'COOK-SET-SS-10PC', 'https://example.com/images/cookware-set.jpg', TRUE),
+(12, 'Food Processor', '12-cup capacity, multiple attachments', 129.99, 45, 'PROC-FOOD-12C-001', 'https://example.com/images/food-processor.jpg', TRUE),
+(13, 'The Midnight Library', 'Fiction novel by Matt Haig', 14.99, 120, 'BOOK-FIC-MID-001', 'https://example.com/images/midnight-library.jpg', TRUE),
+(13, 'Project Hail Mary', 'Sci-fi novel by Andy Weir', 16.99, 95, 'BOOK-FIC-HAL-001', 'https://example.com/images/project-hail-mary.jpg', TRUE),
+(14, 'Atomic Habits', 'Self-help book by James Clear', 18.99, 110, 'BOOK-NFI-ATO-001', 'https://example.com/images/atomic-habits.jpg', TRUE),
+(14, 'Thinking, Fast and Slow', 'Psychology book by Daniel Kahneman', 19.99, 85, 'BOOK-NFI-THI-001', 'https://example.com/images/thinking-fast-slow.jpg', TRUE),
+(15, 'Adjustable Dumbbells', 'Set of 2, 5-52.5 lbs each', 349.99, 25, 'DUMB-ADJ-5252-001', 'https://example.com/images/dumbbells.jpg', TRUE),
+(15, 'Yoga Mat Premium', 'Extra thick, non-slip, eco-friendly', 39.99, 70, 'MAT-YOG-PREM-001', 'https://example.com/images/yoga-mat.jpg', TRUE);
+
+-- Insert orders
+INSERT INTO orders (customer_id, billing_address_id, shipping_address_id, order_status, payment_status, subtotal, tax_amount, shipping_cost, total_amount, order_date, shipped_date, delivered_date) VALUES
+(1, 1, 1, 'delivered', 'completed', 1699.98, 135.99, 0.00, 1835.97, '2025-01-15 10:30:00', '2025-01-16 14:00:00', '2025-01-18 16:30:00'),
+(2, 3, 3, 'delivered', 'completed', 679.98, 54.40, 15.00, 749.38, '2025-01-16 14:22:00', '2025-01-17 09:00:00', '2025-01-20 11:15:00'),
+(3, 4, 5, 'shipped', 'completed', 999.99, 80.00, 0.00, 1079.99, '2025-01-20 09:15:00', '2025-01-21 10:00:00', NULL),
+(4, 6, 6, 'delivered', 'completed', 289.97, 23.20, 12.00, 325.17, '2025-01-18 16:45:00', '2025-01-19 08:30:00', '2025-01-22 14:00:00'),
+(1, 1, 2, 'processing', 'completed', 1999.99, 160.00, 0.00, 2159.99, '2025-01-25 11:00:00', NULL, NULL),
+(5, 7, 7, 'delivered', 'completed', 94.98, 7.60, 8.00, 110.58, '2025-01-17 13:30:00', '2025-01-18 11:00:00', '2025-01-21 09:30:00'),
+(6, 8, 8, 'pending', 'pending', 249.99, 20.00, 25.00, 294.99, '2025-01-28 15:20:00', NULL, NULL),
+(7, 9, 9, 'delivered', 'completed', 899.99, 72.00, 0.00, 971.99, '2025-01-19 10:10:00', '2025-01-20 13:00:00', '2025-01-23 10:45:00'),
+(8, 10, 10, 'cancelled', 'refunded', 549.98, 44.00, 15.00, 608.98, '2025-01-22 12:00:00', NULL, NULL),
+(2, 3, 3, 'delivered', 'completed', 399.99, 32.00, 0.00, 431.99, '2025-01-24 09:30:00', '2025-01-25 10:00:00', '2025-01-27 15:20:00');
+
+-- Insert order items
+INSERT INTO order_items (order_id, product_id, quantity, unit_price, subtotal) VALUES
+(1, 1, 1, 1299.99, 1299.99),
+(1, 5, 1, 399.99, 399.99),
+(2, 6, 2, 279.99, 559.98),
+(2, 10, 1, 44.99, 44.99),
+(2, 20, 2, 37.99, 75.98),
+(3, 3, 1, 999.99, 999.99),
+(4, 7, 2, 39.99, 79.98),
+(4, 8, 1, 59.99, 59.99),
+(4, 15, 1, 14.99, 14.99),
+(4, 16, 2, 16.99, 33.98),
+(4, 17, 1, 18.99, 18.99),
+(4, 18, 1, 19.99, 19.99),
+(4, 20, 1, 39.99, 39.99),
+(4, 9, 1, 49.99, 49.99),
+(5, 2, 1, 1999.99, 1999.99),
+(6, 15, 2, 14.99, 29.98),
+(6, 16, 1, 16.99, 16.99),
+(6, 17, 1, 18.99, 18.99),
+(6, 18, 1, 19.99, 19.99),
+(6, 9, 1, 49.99, 49.99),
+(7, 11, 1, 249.99, 249.99),
+(8, 4, 1, 899.99, 899.99),
+(9, 13, 1, 299.99, 299.99),
+(9, 14, 1, 129.99, 129.99),
+(9, 10, 1, 44.99, 44.99),
+(9, 20, 2, 37.99, 75.98),
+(10, 5, 1, 399.99, 399.99);
+
+-- Insert payments
+INSERT INTO payments (order_id, payment_method, payment_status, transaction_id, amount, payment_date) VALUES
+(1, 'Credit Card', 'completed', 'TXN-2025011510301234', 1835.97, '2025-01-15 10:31:00'),
+(2, 'PayPal', 'completed', 'TXN-2025011614225678', 749.38, '2025-01-16 14:23:00'),
+(3, 'Credit Card', 'completed', 'TXN-2025012009159012', 1079.99, '2025-01-20 09:16:00'),
+(4, 'Debit Card', 'completed', 'TXN-2025011816453456', 325.17, '2025-01-18 16:46:00'),
+(5, 'Credit Card', 'completed', 'TXN-2025012511007890', 2159.99, '2025-01-25 11:01:00'),
+(6, 'Credit Card', 'completed', 'TXN-2025011713301122', 110.58, '2025-01-17 13:31:00'),
+(7, 'PayPal', 'pending', 'TXN-2025012815203344', 294.99, '2025-01-28 15:21:00'),
+(8, 'Credit Card', 'completed', 'TXN-2025011910105566', 971.99, '2025-01-19 10:11:00'),
+(9, 'Debit Card', 'refunded', 'TXN-2025012212007788', 608.98, '2025-01-22 12:01:00'),
+(10, 'Credit Card', 'completed', 'TXN-2025012409309900', 431.99, '2025-01-24 09:31:00');
+
+-- Insert shopping cart items
+INSERT INTO shopping_cart (customer_id, product_id, quantity, added_at) VALUES
+(1, 12, 1, '2025-01-28 14:30:00'),
+(1, 19, 2, '2025-01-28 14:35:00'),
+(3, 6, 1, '2025-01-27 16:20:00'),
+(3, 7, 2, '2025-01-27 16:22:00'),
+(5, 11, 1, '2025-01-28 10:15:00'),
+(6, 2, 1, '2025-01-26 12:00:00'),
+(7, 15, 3, '2025-01-28 09:45:00'),
+(7, 17, 1, '2025-01-28 09:47:00'),
+(8, 10, 2, '2025-01-27 18:30:00'),
+(8, 20, 1, '2025-01-27 18:32:00');
+
+-- Insert product reviews
+INSERT INTO product_reviews (product_id, customer_id, rating, review_text, created_at) VALUES
+(1, 1, 5, 'Excellent laptop! Super fast and the display is amazing. Perfect for work and entertainment.', '2025-01-19 10:00:00'),
+(5, 1, 4, 'Great noise cancellation and sound quality. Battery life is impressive. A bit pricey but worth it.', '2025-01-20 15:30:00'),
+(6, 2, 5, 'These earbuds are fantastic! Comfortable fit and excellent sound. Best purchase this year.', '2025-01-21 09:15:00'),
+(10, 2, 5, 'Perfect yoga pants! Very comfortable and the material is high quality. Highly recommend.', '2025-01-22 14:45:00'),
+(3, 3, 5, 'Love this phone! Camera is incredible and the battery lasts all day.', '2025-01-23 11:20:00'),
+(7, 4, 4, 'Nice shirt, good quality fabric. Fits true to size.', '2025-01-23 16:30:00'),
+(8, 4, 5, 'Perfect fit and very comfortable jeans. Will buy again!', '2025-01-23 16:35:00'),
+(15, 4, 5, 'Great book! Couldn''t put it down. Highly recommended for fiction lovers.', '2025-01-24 10:00:00'),
+(16, 4, 5, 'Amazing sci-fi novel. Andy Weir does it again!', '2025-01-24 10:05:00'),
+(17, 4, 5, 'Life-changing book about building good habits. Must read!', '2025-01-24 10:10:00'),
+(4, 8, 4, 'Solid phone with great features. Battery life could be better but overall very satisfied.', '2025-01-25 12:00:00'),
+(5, 10, 5, 'Best headphones I''ve ever owned. Worth every penny!', '2025-01-28 10:30:00'),
+(2, 5, 5, 'Incredible machine! The M2 chip is blazing fast. Build quality is premium.', '2025-01-26 14:20:00'),
+(15, 6, 4, 'Enjoyed this book thoroughly. Great storytelling.', '2025-01-27 09:00:00'),
+(18, 7, 5, 'Fascinating insights into how we think. Very well written.', '2025-01-27 16:45:00');
