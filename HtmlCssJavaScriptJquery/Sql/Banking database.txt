@@ -1,0 +1,328 @@
+Banking System — Table Structure
+Below are the CREATE TABLE statements for the banking system used throughout this guide.
+
+1. branches — Bank Branches
+CREATE TABLE branches (
+    id              SERIAL PRIMARY KEY,
+    branch_code     VARCHAR(10) UNIQUE NOT NULL,        -- e.g. 'BR-001'
+    branch_name     VARCHAR(150) NOT NULL,               -- e.g. 'Downtown Main Branch'
+    city            VARCHAR(100) NOT NULL,
+    state           VARCHAR(100),
+    phone           VARCHAR(20),
+    is_active       BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+2. customers — Bank Customers
+CREATE TABLE customers (
+    id              SERIAL PRIMARY KEY,
+    customer_code   VARCHAR(20) UNIQUE NOT NULL,         -- e.g. 'CUST-00001'
+    first_name      VARCHAR(100) NOT NULL,
+    last_name       VARCHAR(100) NOT NULL,
+    email           VARCHAR(150) UNIQUE,
+    phone           VARCHAR(20),
+    date_of_birth   DATE,
+    address         TEXT,
+    id_type         VARCHAR(30) NOT NULL                 -- 'PASSPORT', 'NATIONAL_ID', 'DRIVING_LICENSE'
+                    CHECK (id_type IN ('PASSPORT','NATIONAL_ID','DRIVING_LICENSE')),
+    id_number       VARCHAR(50) UNIQUE NOT NULL,
+    kyc_verified    BOOLEAN DEFAULT FALSE,
+    status          VARCHAR(20) DEFAULT 'ACTIVE'
+                    CHECK (status IN ('ACTIVE','INACTIVE','BLOCKED','CLOSED')),
+    branch_id       INT NOT NULL REFERENCES branches(id),
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+3. accounts — Bank Accounts (Savings, Current, Fixed Deposit)
+CREATE TABLE accounts (
+    id              SERIAL PRIMARY KEY,
+    account_number  VARCHAR(20) UNIQUE NOT NULL,         -- e.g. 'ACC-1000000001'
+    customer_id     INT NOT NULL REFERENCES customers(id),
+    branch_id       INT NOT NULL REFERENCES branches(id),
+    account_type    VARCHAR(20) NOT NULL                 -- 'SAVINGS', 'CURRENT', 'FIXED_DEPOSIT'
+                    CHECK (account_type IN ('SAVINGS','CURRENT','FIXED_DEPOSIT')),
+    balance         DECIMAL(15,2) DEFAULT 0.00,
+    currency        VARCHAR(3) DEFAULT 'USD',
+    interest_rate   DECIMAL(5,2) DEFAULT 0.00,           -- annual interest rate %
+    min_balance     DECIMAL(15,2) DEFAULT 500.00,
+    overdraft_limit DECIMAL(15,2) DEFAULT 0.00,          -- only for CURRENT accounts
+    status          VARCHAR(20) DEFAULT 'ACTIVE'
+                    CHECK (status IN ('ACTIVE','DORMANT','FROZEN','CLOSED')),
+    opened_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    closed_at       TIMESTAMP
+);
+4. transactions — All Account Transactions (Deposits, Withdrawals, Transfers)
+CREATE TABLE transactions (
+    id              SERIAL PRIMARY KEY,
+    transaction_ref VARCHAR(30) UNIQUE NOT NULL,          -- e.g. 'TXN-20250129-00001'
+    account_id      INT NOT NULL REFERENCES accounts(id),
+    transaction_type VARCHAR(20) NOT NULL
+                    CHECK (transaction_type IN ('DEPOSIT','WITHDRAWAL','TRANSFER_IN','TRANSFER_OUT','INTEREST','FEE','REVERSAL')),
+    amount          DECIMAL(15,2) NOT NULL CHECK (amount > 0),
+    balance_before  DECIMAL(15,2) NOT NULL,
+    balance_after   DECIMAL(15,2) NOT NULL,
+    description     TEXT,
+    related_txn_id  INT REFERENCES transactions(id),  -- links transfer pairs
+    performed_by    INT,                                  -- teller/employee id
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+5. transfers — Fund Transfer Records
+CREATE TABLE transfers (
+    id                  SERIAL PRIMARY KEY,
+    transfer_ref        VARCHAR(30) UNIQUE NOT NULL,      -- e.g. 'TRF-20250129-00001'
+    from_account_id     INT NOT NULL REFERENCES accounts(id),
+    to_account_id       INT NOT NULL REFERENCES accounts(id),
+    amount              DECIMAL(15,2) NOT NULL CHECK (amount > 0),
+    fee                 DECIMAL(15,2) DEFAULT 0.00,
+    status              VARCHAR(20) DEFAULT 'COMPLETED'
+                        CHECK (status IN ('PENDING','COMPLETED','FAILED','REVERSED')),
+    description         TEXT,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_diff_accounts CHECK (from_account_id != to_account_id)
+);
+6. loans — Loan Accounts
+CREATE TABLE loans (
+    id                  SERIAL PRIMARY KEY,
+    loan_number         VARCHAR(20) UNIQUE NOT NULL,      -- e.g. 'LN-00001'
+    customer_id         INT NOT NULL REFERENCES customers(id),
+    account_id          INT NOT NULL REFERENCES accounts(id),  -- linked disbursement account
+    loan_type           VARCHAR(30) NOT NULL
+                        CHECK (loan_type IN ('PERSONAL','HOME','AUTO','BUSINESS','EDUCATION')),
+    principal_amount    DECIMAL(15,2) NOT NULL,
+    interest_rate       DECIMAL(5,2) NOT NULL,            -- annual %
+    tenure_months       INT NOT NULL,
+    emi_amount          DECIMAL(15,2) NOT NULL,
+    total_paid          DECIMAL(15,2) DEFAULT 0.00,
+    outstanding_balance DECIMAL(15,2) NOT NULL,
+    status              VARCHAR(20) DEFAULT 'ACTIVE'
+                        CHECK (status IN ('PENDING','APPROVED','ACTIVE','CLOSED','DEFAULTED')),
+    disbursed_at        TIMESTAMP,
+    next_emi_date       DATE,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+7. loan_payments — EMI / Loan Repayments
+CREATE TABLE loan_payments (
+    id              SERIAL PRIMARY KEY,
+    loan_id         INT NOT NULL REFERENCES loans(id),
+    payment_ref     VARCHAR(30) UNIQUE NOT NULL,
+    payment_date    DATE NOT NULL,
+    principal_part  DECIMAL(15,2) NOT NULL,
+    interest_part   DECIMAL(15,2) NOT NULL,
+    total_amount    DECIMAL(15,2) NOT NULL,
+    penalty         DECIMAL(15,2) DEFAULT 0.00,
+    status          VARCHAR(20) DEFAULT 'PAID'
+                    CHECK (status IN ('PAID','FAILED','REVERSED')),
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+8. beneficiaries — Saved Transfer Recipients
+CREATE TABLE beneficiaries (
+    id              SERIAL PRIMARY KEY,
+    customer_id     INT NOT NULL REFERENCES customers(id),
+    beneficiary_name VARCHAR(150) NOT NULL,
+    account_number  VARCHAR(20) NOT NULL,
+    bank_name       VARCHAR(150) DEFAULT 'SAME_BANK',
+    ifsc_code       VARCHAR(20),
+    is_verified     BOOLEAN DEFAULT FALSE,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(customer_id, account_number)
+);
+9. audit_log — Audit Trail for All Operations
+CREATE TABLE audit_log (
+    id              SERIAL PRIMARY KEY,
+    table_name      VARCHAR(100) NOT NULL,
+    operation       VARCHAR(20) NOT NULL,                 -- 'INSERT', 'UPDATE', 'DELETE', 'TRANSFER', etc.
+    record_id       INT,
+    old_values      JSONB,
+    new_values      JSONB,
+    performed_by    INT,
+    ip_address      VARCHAR(45),
+    performed_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+Entity Relationship Summary
+branches ──< customers ──< accounts ──< transactions
+                │               │
+                │               ├──< transfers (from_account_id)
+                │               ├──< transfers (to_account_id)
+                │               │
+                ├──< loans ─────┘
+                │       │
+                │       └──< loan_payments
+                │
+                └──< beneficiaries
+
+accounts ──< transactions (related_txn_id self-ref)
+
+
+Sample Data — INSERT Statements for All Tables
+Insert the data in the order shown below (parent tables first to satisfy foreign key constraints).
+
+1. Insert Branches
+INSERT INTO branches (branch_code, branch_name, city, state, phone) VALUES
+('BR-001', 'Downtown Main Branch',   'New York',    'NY', '+1-212-555-0101'),
+('BR-002', 'Westside Branch',        'Los Angeles', 'CA', '+1-310-555-0102'),
+('BR-003', 'Lakefront Branch',       'Chicago',     'IL', '+1-312-555-0103'),
+('BR-004', 'Midtown Branch',         'Houston',     'TX', '+1-713-555-0104'),
+('BR-005', 'Central Avenue Branch',  'Phoenix',     'AZ', '+1-602-555-0105');
+
+2. Insert Customers
+INSERT INTO customers (customer_code, first_name, last_name, email, phone, date_of_birth, address, id_type, id_number, kyc_verified, status, branch_id) VALUES
+('CUST-00001', 'John',    'Doe',      'john.doe@email.com',      '+1-212-555-1001', '1990-05-15', '123 Main St, New York, NY',       'PASSPORT',        'P12345678', TRUE,  'ACTIVE', 1),
+('CUST-00002', 'Jane',    'Smith',    'jane.smith@email.com',    '+1-310-555-1002', '1985-08-22', '456 Oak Ave, Los Angeles, CA',     'NATIONAL_ID',     'N98765432', TRUE,  'ACTIVE', 2),
+('CUST-00003', 'Robert',  'Johnson',  'robert.j@email.com',      '+1-312-555-1003', '1978-12-01', '789 Lake Dr, Chicago, IL',         'DRIVING_LICENSE',  'D55667788', TRUE,  'ACTIVE', 3),
+('CUST-00004', 'Emily',   'Williams', 'emily.w@email.com',       '+1-713-555-1004', '1995-03-10', '321 Elm St, Houston, TX',          'PASSPORT',        'P87654321', FALSE, 'ACTIVE', 4),
+('CUST-00005', 'Michael', 'Brown',    'michael.b@email.com',     '+1-602-555-1005', '1982-07-28', '654 Pine Rd, Phoenix, AZ',         'NATIONAL_ID',     'N11223344', TRUE,  'ACTIVE', 5),
+('CUST-00006', 'Sarah',   'Davis',    'sarah.d@email.com',       '+1-212-555-1006', '1992-11-05', '987 Broadway, New York, NY',       'DRIVING_LICENSE',  'D99887766', TRUE,  'ACTIVE', 1),
+('CUST-00007', 'David',   'Wilson',   'david.w@email.com',       '+1-310-555-1007', '1988-01-19', '147 Sunset Blvd, Los Angeles, CA', 'PASSPORT',        'P44556677', TRUE,  'INACTIVE', 2),
+('CUST-00008', 'Lisa',    'Taylor',   'lisa.t@email.com',        '+1-312-555-1008', '2000-09-30', '258 Michigan Ave, Chicago, IL',    'NATIONAL_ID',     'N33445566', TRUE,  'ACTIVE', 3),
+('CUST-00009', 'James',   'Anderson', 'james.a@email.com',       '+1-713-555-1009', '1975-06-14', '369 Texas Ave, Houston, TX',       'DRIVING_LICENSE',  'D22334455', TRUE,  'BLOCKED', 4),
+('CUST-00010', 'Karen',   'Thomas',   'karen.t@email.com',       '+1-602-555-1010', '1998-04-25', '741 Desert Rd, Phoenix, AZ',       'PASSPORT',        'P66778899', TRUE,  'ACTIVE', 5);
+
+3. Insert Accounts
+INSERT INTO accounts (account_number, customer_id, branch_id, account_type, balance, currency, interest_rate, min_balance, overdraft_limit, status) VALUES
+-- John Doe — 2 accounts
+('ACC-0000000001', 1, 1, 'SAVINGS',       52400.00, 'USD', 3.50, 500.00,     0.00, 'ACTIVE'),
+('ACC-0000000002', 1, 1, 'CURRENT',       18500.00, 'USD', 0.00, 5000.00, 10000.00, 'ACTIVE'),
+-- Jane Smith
+('ACC-0000000003', 2, 2, 'SAVINGS',       34200.00, 'USD', 3.50, 500.00,     0.00, 'ACTIVE'),
+('ACC-0000000004', 2, 2, 'FIXED_DEPOSIT', 100000.00,'USD', 6.50, 10000.00,   0.00, 'ACTIVE'),
+-- Robert Johnson
+('ACC-0000000005', 3, 3, 'SAVINGS',       12750.00, 'USD', 3.50, 500.00,     0.00, 'ACTIVE'),
+('ACC-0000000006', 3, 3, 'CURRENT',       45000.00, 'USD', 0.00, 5000.00, 25000.00, 'ACTIVE'),
+-- Emily Williams
+('ACC-0000000007', 4, 4, 'SAVINGS',        8200.00, 'USD', 3.50, 500.00,     0.00, 'ACTIVE'),
+-- Michael Brown
+('ACC-0000000008', 5, 5, 'SAVINGS',       67800.00, 'USD', 4.00, 500.00,     0.00, 'ACTIVE'),
+('ACC-0000000009', 5, 5, 'CURRENT',       22000.00, 'USD', 0.00, 5000.00, 15000.00, 'ACTIVE'),
+-- Sarah Davis
+('ACC-0000000010', 6, 1, 'SAVINGS',       15400.00, 'USD', 3.50, 500.00,     0.00, 'ACTIVE'),
+-- David Wilson (INACTIVE customer)
+('ACC-0000000011', 7, 2, 'SAVINGS',        3200.00, 'USD', 3.50, 500.00,     0.00, 'DORMANT'),
+-- Lisa Taylor
+('ACC-0000000012', 8, 3, 'SAVINGS',       28900.00, 'USD', 3.50, 500.00,     0.00, 'ACTIVE'),
+-- James Anderson (BLOCKED customer)
+('ACC-0000000013', 9, 4, 'CURRENT',       41000.00, 'USD', 0.00, 5000.00, 20000.00, 'FROZEN'),
+-- Karen Thomas
+('ACC-0000000014', 10, 5, 'SAVINGS',       9600.00, 'USD', 3.50, 500.00,     0.00, 'ACTIVE'),
+('ACC-0000000015', 10, 5, 'FIXED_DEPOSIT', 50000.00,'USD', 6.00, 10000.00,   0.00, 'ACTIVE');
+
+4. Insert Transactions
+INSERT INTO transactions (transaction_ref, account_id, transaction_type, amount, balance_before, balance_after, description, performed_by) VALUES
+-- John Doe savings (ACC-0000000001)
+('TXN-20250101-00001', 1, 'DEPOSIT',      50000.00, 0.00,     50000.00, 'Initial deposit',            1),
+('TXN-20250105-00002', 1, 'DEPOSIT',      10000.00, 50000.00, 60000.00, 'Salary credit - Jan 2025',   NULL),
+('TXN-20250110-00003', 1, 'WITHDRAWAL',    5000.00, 60000.00, 55000.00, 'ATM withdrawal',             NULL),
+('TXN-20250115-00004', 1, 'TRANSFER_OUT',  3000.00, 55000.00, 52000.00, 'Rent payment to ACC-03',     2),
+('TXN-20250120-00005', 1, 'INTEREST',       400.00, 52000.00, 52400.00, 'Monthly interest - Jan',     NULL),
+
+-- John Doe current (ACC-0000000002)
+('TXN-20250101-00006', 2, 'DEPOSIT',      25000.00, 0.00,     25000.00, 'Initial deposit',            1),
+('TXN-20250112-00007', 2, 'WITHDRAWAL',    6500.00, 25000.00, 18500.00, 'Business expense',           NULL),
+
+-- Jane Smith savings (ACC-0000000003)
+('TXN-20250101-00008', 3, 'DEPOSIT',      30000.00, 0.00,     30000.00, 'Initial deposit',            1),
+('TXN-20250115-00009', 3, 'TRANSFER_IN',   3000.00, 30000.00, 33000.00, 'Rent received from ACC-01',  2),
+('TXN-20250118-00010', 3, 'DEPOSIT',       1200.00, 33000.00, 34200.00, 'Freelance payment',          NULL),
+
+-- Robert Johnson savings (ACC-0000000005)
+('TXN-20250101-00011', 5, 'DEPOSIT',      15000.00, 0.00,     15000.00, 'Initial deposit',            3),
+('TXN-20250108-00012', 5, 'WITHDRAWAL',    2500.00, 15000.00, 12500.00, 'Bill payment',               NULL),
+('TXN-20250122-00013', 5, 'INTEREST',       250.00, 12500.00, 12750.00, 'Monthly interest - Jan',     NULL),
+
+-- Michael Brown savings (ACC-0000000008)
+('TXN-20250101-00014', 8, 'DEPOSIT',      60000.00, 0.00,     60000.00, 'Initial deposit',            5),
+('TXN-20250110-00015', 8, 'DEPOSIT',       5000.00, 60000.00, 65000.00, 'Bonus credit',               NULL),
+('TXN-20250115-00016', 8, 'TRANSFER_OUT',  2000.00, 65000.00, 63000.00, 'Transfer to friend ACC-14',  NULL),
+('TXN-20250120-00017', 8, 'DEPOSIT',       5000.00, 63000.00, 68000.00, 'Dividend income',            NULL),
+('TXN-20250125-00018', 8, 'FEE',            200.00, 68000.00, 67800.00, 'Annual maintenance fee',     NULL),
+
+-- Karen Thomas savings (ACC-0000000014)
+('TXN-20250101-00019', 14, 'DEPOSIT',      7500.00, 0.00,      7500.00, 'Initial deposit',            5),
+('TXN-20250115-00020', 14, 'TRANSFER_IN',  2000.00, 7500.00,   9500.00, 'Transfer from ACC-08',       NULL),
+('TXN-20250128-00021', 14, 'INTEREST',      100.00, 9500.00,   9600.00, 'Monthly interest - Jan',     NULL);
+
+
+5. Insert Transfers
+INSERT INTO transfers (transfer_ref, from_account_id, to_account_id, amount, fee, status, description) VALUES
+('TRF-20250115-00001', 1,  3,  3000.00, 0.00, 'COMPLETED', 'Rent payment - Jan 2025'),
+('TRF-20250115-00002', 8, 14,  2000.00, 5.00, 'COMPLETED', 'Transfer to friend Karen'),
+('TRF-20250120-00003', 5,  1,  1000.00, 5.00, 'COMPLETED', 'Repayment to John'),
+('TRF-20250122-00004', 3, 10,   500.00, 0.00, 'COMPLETED', 'Gift to Sarah'),
+('TRF-20250125-00005', 6,  2,  2000.00, 5.00, 'FAILED',    'Insufficient funds transfer attempt');
+
+6. Insert Loans
+INSERT INTO loans (loan_number, customer_id, account_id, loan_type, principal_amount, interest_rate, tenure_months, emi_amount, total_paid, outstanding_balance, status, disbursed_at, next_emi_date) VALUES
+('LN-00001', 1, 1, 'HOME',      500000.00, 8.50, 240, 4341.76,  52101.12, 447898.88, 'ACTIVE',   '2024-01-15', '2025-02-15'),
+('LN-00002', 2, 3, 'PERSONAL',   50000.00, 12.00,  36, 1661.22,  11628.54,  38371.46, 'ACTIVE',   '2024-06-01', '2025-02-01'),
+('LN-00003', 3, 5, 'AUTO',      200000.00, 9.00,   60, 4150.67,  24904.02, 175095.98, 'ACTIVE',   '2024-08-10', '2025-02-10'),
+('LN-00004', 5, 8, 'BUSINESS',  300000.00, 10.50,  48, 7672.84,      0.00, 300000.00, 'APPROVED', NULL,          NULL),
+('LN-00005', 6, 10,'EDUCATION',  80000.00, 7.50,   48, 1936.45,   5809.35,  74190.65, 'ACTIVE',   '2024-10-01', '2025-02-01'),
+('LN-00006', 8, 12,'PERSONAL',   25000.00, 11.00,  24, 1169.59,   3508.77,  21491.23, 'ACTIVE',   '2024-11-01', '2025-02-01'),
+('LN-00007', 10,14,'HOME',      150000.00, 8.00,  180, 1433.48,      0.00, 150000.00, 'PENDING',  NULL,          NULL);
+
+7. Insert Loan Payments
+INSERT INTO loan_payments (loan_id, payment_ref, payment_date, principal_part, interest_part, total_amount, penalty, status) VALUES
+-- Home loan (LN-00001) — 12 months of payments
+('PAY-LN01-202402', '2024-02-15', 802.26,  3539.50, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202403', '2024-03-15', 807.94,  3533.82, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202404', '2024-04-15', 813.67,  3528.09, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202405', '2024-05-15', 819.43,  3522.33, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202406', '2024-06-15', 825.24,  3516.52, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202407', '2024-07-15', 831.08,  3510.68, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202408', '2024-08-15', 836.97,  3504.79, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202409', '2024-09-15', 842.90,  3498.86, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202410', '2024-10-15', 848.87,  3492.89, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202411', '2024-11-15', 854.88,  3486.88, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202412', '2024-12-15', 860.93,  3480.83, 4341.76, 0.00, 'PAID'),
+('PAY-LN01-202501', '2025-01-15', 866.95,  3474.81, 4341.76, 0.00, 'PAID'),
+
+-- Personal loan (LN-00002) — 7 months
+('PAY-LN02-202407', '2024-07-01', 1161.22, 500.00, 1661.22, 0.00, 'PAID'),
+('PAY-LN02-202408', '2024-08-01', 1172.83, 488.39, 1661.22, 0.00, 'PAID'),
+('PAY-LN02-202409', '2024-09-01', 1184.56, 476.66, 1661.22, 0.00, 'PAID'),
+('PAY-LN02-202410', '2024-10-01', 1196.41, 464.81, 1661.22, 0.00, 'PAID'),
+('PAY-LN02-202411', '2024-11-01', 1208.37, 452.85, 1661.22, 0.00, 'PAID'),
+('PAY-LN02-202412', '2024-12-01', 1220.46, 440.76, 1661.22, 0.00, 'PAID'),
+('PAY-LN02-202501', '2025-01-01', 1232.67, 428.55, 1661.22, 0.00, 'PAID'),
+
+-- Auto loan (LN-00003) — 6 months
+('PAY-LN03-202409', '2024-09-10', 2650.67, 1500.00, 4150.67, 0.00, 'PAID'),
+('PAY-LN03-202410', '2024-10-10', 2670.55, 1480.12, 4150.67, 0.00, 'PAID'),
+('PAY-LN03-202411', '2024-11-10', 2690.58, 1460.09, 4150.67, 0.00, 'PAID'),
+('PAY-LN03-202412', '2024-12-10', 2710.76, 1439.91, 4150.67, 0.00, 'PAID'),
+('PAY-LN03-202501', '2025-01-10', 2731.09, 1419.58, 4150.67, 0.00, 'PAID'),
+('PAY-LN03-202502', '2025-01-25', 2751.46, 1399.21, 4150.67, 75.00,'PAID'),  -- late payment with penalty
+
+-- Education loan (LN-00005) — 3 months
+('PAY-LN05-202411', '2024-11-01', 1436.45, 500.00, 1936.45, 0.00, 'PAID'),
+('PAY-LN05-202412', '2024-12-01', 1445.42, 491.03, 1936.45, 0.00, 'PAID'),
+('PAY-LN05-202501', '2025-01-01', 1454.43, 482.02, 1936.45, 0.00, 'PAID'),
+
+-- Personal loan (LN-00006) — 3 months
+('PAY-LN06-202412', '2024-12-01',  940.51, 229.08, 1169.59, 0.00, 'PAID'),
+('PAY-LN06-202501', '2025-01-01',  949.13, 220.46, 1169.59, 0.00, 'PAID'),
+('PAY-LN06-202502', '2025-01-28',  957.82, 211.77, 1169.59, 0.00, 'PAID');
+
+8. Insert Beneficiaries
+INSERT INTO beneficiaries (customer_id, beneficiary_name, account_number, bank_name, ifsc_code, is_verified) VALUES
+(1, 'Jane Smith',         'ACC-0000000003', 'SAME_BANK',        NULL,           TRUE),
+(1, 'Robert Johnson',     'ACC-0000000005', 'SAME_BANK',        NULL,           TRUE),
+(1, 'Alice Cooper',       '9876543210',     'Chase Bank',       'CHAS0001234',  TRUE),
+(2, 'John Doe',           'ACC-0000000001', 'SAME_BANK',        NULL,           TRUE),
+(2, 'External Vendor',    '1122334455',     'Bank of America',  'BOFA0005678',  FALSE),
+(5, 'Karen Thomas',       'ACC-0000000014', 'SAME_BANK',        NULL,           TRUE),
+(5, 'Supplier Corp',      '5566778899',     'Wells Fargo',      'WELF0009012',  TRUE),
+(6, 'John Doe',           'ACC-0000000001', 'SAME_BANK',        NULL,           TRUE),
+(8, 'Sarah Davis',        'ACC-0000000010', 'SAME_BANK',        NULL,           TRUE),
+(10,'Michael Brown',      'ACC-0000000008', 'SAME_BANK',        NULL,           TRUE);
+
+9. Insert Audit Log
+INSERT INTO audit_log (table_name, operation, record_id, old_values, new_values, performed_by, ip_address) VALUES
+('customers', 'INSERT', 1,  NULL, '{"customer_code":"CUST-00001","name":"John Doe"}',                                         1, '192.168.1.10'),
+('accounts',  'INSERT', 1,  NULL, '{"account_number":"ACC-0000000001","type":"SAVINGS","initial_deposit":50000}',              1, '192.168.1.10'),
+('accounts',  'INSERT', 2,  NULL, '{"account_number":"ACC-0000000002","type":"CURRENT","initial_deposit":25000}',              1, '192.168.1.10'),
+('transfers', 'TRANSFER', 1, NULL,'{"from":"ACC-0000000001","to":"ACC-0000000003","amount":3000,"fee":0}',                     2, '192.168.1.15'),
+('accounts',  'UPDATE', 11, '{"status":"ACTIVE"}', '{"status":"DORMANT","reason":"No activity for 365 days"}',                NULL, '10.0.0.1'),
+('accounts',  'UPDATE', 13, '{"status":"ACTIVE"}', '{"status":"FROZEN","reason":"Suspicious activity detected"}',             10, '10.0.0.1'),
+('loans',     'INSERT', 1,  NULL, '{"loan_number":"LN-00001","type":"HOME","principal":500000}',                               3, '192.168.1.20'),
+('loans',     'DISBURSE', 1, '{"status":"APPROVED"}', '{"status":"ACTIVE","disbursed_amount":500000}',                         3, '192.168.1.20'),
+('transfers', 'TRANSFER', 2, NULL,'{"from":"ACC-0000000008","to":"ACC-0000000014","amount":2000,"fee":5}',                     NULL, '192.168.1.50'),
+('customers', 'UPDATE', 9,  '{"status":"ACTIVE"}', '{"status":"BLOCKED","reason":"Failed KYC re-verification"}',               10, '10.0.0.1');

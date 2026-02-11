@@ -1,20 +1,81 @@
-SELECT s.name AS StudentName, e.`english`+e.`maths`+e.`science` AS Total FROM student s,marks e WHERE s.`rollno`=e.`rollno`;
+Count employees in each department
+----------------------------------
+SELECT department_id, COUNT(*) AS employee_count
+FROM employees
+GROUP BY department_id;
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Find the second highest salary
+------------------------------
+SELECT MAX(`Salary`) FROM `student` WHERE `Salary` < ( SELECT MAX(`Salary`) FROM `student`);
+
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Find the second lowest salary
+------------------------------
+SELECT MIN(`Salary`) FROM `student` WHERE `Salary` > ( SELECT MIN(`Salary`) FROM `student`);
+
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Find duplicate email addresses
+---------------------------------
+SELECT email, COUNT(*) AS count
+FROM users
+GROUP BY email
+HAVING COUNT(*) > 1;
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Find departments with average salary > 60,000
+------------------------------------------------
+SELECT department_id, AVG(salary) AS avg_salary
+FROM employees
+GROUP BY department_id
+HAVING AVG(salary) > 60000;
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Find employees hired in the last 6 months
+------------------------------------------
+SELECT * FROM employees
+WHERE hire_date >= DATEADD(MONTH, -6, GETDATE());
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Calculate running total of sales
+---------------------------------
+SELECT order_date, amount,
+       SUM(amount) OVER (ORDER BY order_date) AS running_total
+FROM orders;
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+Pivot table - sales by product and month
+------------------------------------------
+SELECT product_id,
+       SUM(CASE WHEN MONTH(order_date) = 1 THEN amount ELSE 0 END) AS Jan,
+       SUM(CASE WHEN MONTH(order_date) = 2 THEN amount ELSE 0 END) AS Feb,
+       SUM(CASE WHEN MONTH(order_date) = 3 THEN amount ELSE 0 END) AS Mar
+FROM sales
+GROUP BY product_id;
+
+
+
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 SELECT * FROM `student` WHERE NAME LIKE 'R%' OR NAME LIKE 'r%';
 
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-"second highest salary"
-SELECT MAX(`Salary`) FROM `student` WHERE `Salary` < ( SELECT MAX(`Salary`) FROM `student`);
-
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-"second lowest salary"
-SELECT MIN(`Salary`) FROM `student` WHERE `Salary` > ( SELECT MIN(`Salary`) FROM `student`);
-
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 select e.Empid, e.Ename	,e.Egender,e.ESalary,
 
